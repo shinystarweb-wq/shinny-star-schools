@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import * as faceapi from "face-api.js";
@@ -20,13 +20,18 @@ function Field({ label, children }) {
 }
 
 export default function TeacherProfile() {
+  const [schoolSettings, setSchoolSettings] = useState(null);
   const { id } = useParams();
+  const searchParams = useSearchParams();
+  const newPin = searchParams.get("newpin");
+
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState("profile");
   const [form, setForm] = useState(null);
+  const [resettingPin, setResettingPin] = useState(false);
 
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -42,6 +47,8 @@ export default function TeacherProfile() {
       if (!error) {
         setTeacher(data);
         setForm(data);
+        const { data: settingsData } = await supabase.from("school_settings").select("*").eq("location", data.location).single();
+        setSchoolSettings(settingsData);
       }
       setLoading(false);
     }
@@ -59,6 +66,19 @@ export default function TeacherProfile() {
     if (!error) {
       setTeacher(form);
       setEditing(false);
+    }
+  }
+
+  async function resetPin() {
+    if (!confirm("Generate a new PIN for this teacher? The old PIN will stop working for login and attendance.")) return;
+    setResettingPin(true);
+    const newPinValue = Math.floor(100000 + Math.random() * 900000).toString();
+    const { error } = await supabase.from("teachers").update({ pin: newPinValue }).eq("id", id);
+    setResettingPin(false);
+    if (!error) {
+      setTeacher((prev) => ({ ...prev, pin: newPinValue }));
+      setForm((prev) => ({ ...prev, pin: newPinValue }));
+      alert("New PIN: " + newPinValue);
     }
   }
 
@@ -130,6 +150,7 @@ export default function TeacherProfile() {
 
   const qrData = typeof window !== "undefined" ? window.location.origin + "/admin-dashboard/teachers/view/" + id : id;
   const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(qrData);
+  const loginUsername = teacher.full_name.trim().split(" ").pop().toLowerCase();
 
   return (
     <div className="max-w-3xl">
@@ -144,12 +165,39 @@ export default function TeacherProfile() {
           )}
           <div>
             <h1 className="text-xl font-bold text-slate-800">{teacher.full_name}</h1>
-            <p className="text-sm text-slate-500">{teacher.subject || "No subject set"} • {teacher.branch}</p>
+            <p className="text-sm text-slate-500">{teacher.subject || "No subject set"} • {teacher.branch}{teacher.staff_id ? " • " + teacher.staff_id : ""}</p>
           </div>
         </div>
         <span className={"text-xs font-semibold px-3 py-1.5 rounded-full " + (teacher.verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}>
           {teacher.verified ? "✓ Verified" : "⚠ Not Verified"}
         </span>
+      </div>
+
+      {newPin && (
+        <div className="bg-brand-blue border border-brand-blue-strong/20 rounded-2xl p-5 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Staff login PIN generated</p>
+              <p className="text-xs text-slate-500 mt-0.5">This won't be shown again after you leave this page. Share it with the teacher.</p>
+            </div>
+            <p className="text-3xl font-bold text-brand-blue-strong tracking-widest">{newPin}</p>
+          </div>
+          <p className="text-xs text-slate-600 bg-white/60 rounded-lg px-3 py-2 mt-2">Tell the teacher: log in at the Teacher Portal using <strong>{loginUsername}</strong> as your username and <strong>{newPin}</strong> as your PIN.</p>
+        </div>
+      )}
+
+      <div className="border border-slate-200 rounded-2xl p-5 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Login & Attendance PIN</p>
+            <p className="text-xs text-slate-500 mt-0.5">Used to log into the Teacher Portal and for PIN-based attendance check-in.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-lg font-bold text-slate-800 tracking-widest">{teacher.pin || "Not set"}</p>
+            <button onClick={resetPin} disabled={resettingPin} className="text-sm border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-50">{resettingPin ? "..." : "Reset PIN"}</button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mt-3 border-t border-slate-100 pt-3">Login instructions for the teacher: use <strong className="text-slate-700">{loginUsername}</strong> (surname, lowercase) as your username and your PIN above to sign in to any portal.</p>
       </div>
 
       <div className="flex gap-2 border-b border-slate-200 mb-6">
@@ -174,6 +222,7 @@ export default function TeacherProfile() {
 
           {!editing ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <p><span className="text-slate-500">Staff ID:</span> <span className="text-slate-800 font-medium">{teacher.staff_id || "-"}</span></p>
               <p><span className="text-slate-500">Gender:</span> <span className="text-slate-800 font-medium capitalize">{teacher.gender || "-"}</span></p>
               <p><span className="text-slate-500">State of Origin:</span> <span className="text-slate-800 font-medium">{teacher.state_of_origin || "-"}</span></p>
               <p><span className="text-slate-500">Department:</span> <span className="text-slate-800 font-medium">{teacher.department || "-"}</span></p>
@@ -228,8 +277,12 @@ export default function TeacherProfile() {
               <div className="absolute -top-10 -left-10 w-28 h-28 rounded-full bg-white/10"></div>
               <div className="absolute -bottom-14 -right-10 w-32 h-32 rounded-full bg-white/10"></div>
               <div className="text-center relative z-10 flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full bg-white/20 border border-white/40 flex items-center justify-center mb-2 text-lg">🏫</div>
-                <p className="font-bold tracking-wide text-sm leading-tight">SHINNY STAR SCHOOLS</p>
+                {schoolSettings?.logo_url ? (
+                  <img src={schoolSettings.logo_url} alt="Logo" className="w-12 h-12 rounded-full object-cover bg-white mb-2" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-white/20 border border-white/40 flex items-center justify-center mb-2 text-lg">🏫</div>
+                )}
+                <p className="font-bold tracking-wide text-sm leading-tight">{schoolSettings?.school_name || "SHINNY STAR SCHOOLS"}</p>
                 <p className="text-[10px] text-white/70 mt-1 uppercase tracking-wider">Staff ID Card</p>
               </div>
               <img src={qrUrl} alt="QR Code" className="w-24 h-24 rounded-lg bg-white p-1.5 relative z-10" />
@@ -256,14 +309,14 @@ export default function TeacherProfile() {
 
               <div className="grid grid-cols-2 gap-x-6 gap-y-2 mt-5 text-xs">
                 <p><span className="text-slate-400">Gender</span><br /><span className="text-slate-700 font-medium capitalize">{teacher.gender || "-"}</span></p>
-                <p><span className="text-slate-400">Qualification</span><br /><span className="text-slate-700 font-medium">{teacher.qualification || "-"}</span></p>
+                <p><span className="text-slate-400">Staff ID</span><br /><span className="text-slate-700 font-medium">{teacher.staff_id || "-"}</span></p>
                 <p><span className="text-slate-400">Phone</span><br /><span className="text-slate-700 font-medium">{teacher.phone || "-"}</span></p>
                 <p><span className="text-slate-400">Employed</span><br /><span className="text-slate-700 font-medium">{teacher.employment_date || "-"}</span></p>
               </div>
 
               <div className="border-t border-dashed border-slate-200 mt-5 pt-3 flex items-center justify-between">
                 <p className="text-[10px] text-slate-400">ID: {id.slice(0, 8).toUpperCase()}</p>
-                <p className="text-[10px] text-slate-400">shinnystarschools.com.ng</p>
+                <p className="text-[10px] text-slate-400">{schoolSettings?.website || "shinystarschools.com.ng"}</p>
               </div>
             </div>
           </div>

@@ -13,27 +13,77 @@ export default function Login() {
 
   const roles = [{ key: "admin", label: "Admin" }, { key: "teacher", label: "Teacher" }, { key: "student", label: "Student" }];
 
+  function selectRole(r) {
+    setRole(r);
+    setError("");
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const { data, error: queryError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("username", username.trim().toLowerCase())
-      .eq("pin", pin.trim())
-      .eq("role", role)
-      .single();
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanPin = pin.trim();
 
-    setLoading(false);
+    if (role === "admin") {
+      const { data, error: queryError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("username", cleanUsername)
+        .eq("pin", cleanPin)
+        .eq("role", "admin")
+        .single();
 
-    if (queryError || !data) {
-      setError("Invalid username, PIN, or portal selected.");
+      setLoading(false);
+
+      if (queryError || !data) {
+        setError("Invalid username or PIN.");
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("shinnystar_user", JSON.stringify({ id: data.id, role: "admin", username: data.username, location: data.location }));
+      }
+      router.push("/admin-dashboard");
       return;
     }
 
-    router.push("/" + role + "-dashboard");
+    if (role === "teacher") {
+      const { data: teachers } = await supabase.from("teachers").select("*").eq("pin", cleanPin);
+      const match = (teachers || []).find((t) => t.full_name.trim().split(" ").pop().toLowerCase() === cleanUsername);
+
+      setLoading(false);
+
+      if (!match) {
+        setError("Invalid username or PIN.");
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("shinnystar_user", JSON.stringify({ id: match.id, role: "teacher", username: cleanUsername, branch: match.branch, location: match.location, full_name: match.full_name }));
+      }
+      router.push("/teacher-dashboard");
+      return;
+    }
+
+    if (role === "student") {
+      const { data: students } = await supabase.from("students").select("*").eq("pin", cleanPin);
+      const match = (students || []).find((s) => s.full_name.trim().split(" ").pop().toLowerCase() === cleanUsername);
+
+      setLoading(false);
+
+      if (!match) {
+        setError("Invalid username or PIN.");
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("shinnystar_user", JSON.stringify({ id: match.id, role: "student", username: cleanUsername, branch: match.branch, location: match.location, class: match.class, full_name: match.full_name }));
+      }
+      router.push("/student-dashboard");
+      return;
+    }
   }
 
   return (
@@ -44,7 +94,7 @@ export default function Login() {
 
         <div className="flex bg-brand-blue rounded-lg p-1 mb-6">
           {roles.map((r) => (
-            <button key={r.key} type="button" onClick={() => setRole(r.key)} className={role === r.key ? "flex-1 py-2 text-sm font-medium rounded-md transition bg-brand-blue-strong text-white" : "flex-1 py-2 text-sm font-medium rounded-md transition text-slate-600"}>{r.label}</button>
+            <button key={r.key} type="button" onClick={() => selectRole(r.key)} className={role === r.key ? "flex-1 py-2 text-sm font-medium rounded-md transition bg-brand-blue-strong text-white" : "flex-1 py-2 text-sm font-medium rounded-md transition text-slate-600"}>{r.label}</button>
           ))}
         </div>
 

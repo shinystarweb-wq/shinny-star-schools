@@ -30,7 +30,10 @@ export default function BranchStudentsPage() {
       setLoading(true);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
+      const stored = sessionStorage.getItem("shinnystar_user");
+      const location = stored ? JSON.parse(stored).location : null;
       let query = supabase.from("students").select("*", { count: "exact" }).eq("branch", branchLabel).order("full_name").range(from, to);
+      if (location) query = query.eq("location", location);
       if (search.trim()) query = query.ilike("full_name", "%" + search.trim() + "%");
       if (classFilter) query = query.eq("class", classFilter);
       if (departmentFilter) query = query.eq("department", departmentFilter);
@@ -95,8 +98,7 @@ const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
                   <th className="text-left px-5 py-3 font-semibold">Class</th>
                   <th className="text-left px-5 py-3 font-semibold">Department</th>
                   <th className="text-left px-5 py-3 font-semibold">Gender</th>
-                  <th className="text-left px-5 py-3 font-semibold">Guardian</th>
-                  <th className="text-left px-5 py-3 font-semibold">Phone</th>
+<th className="text-left px-5 py-3 font-semibold">PIN</th>
                   <th className="text-left px-5 py-3 font-semibold">Status</th>
                   <th className="px-5 py-3"></th>
                 </tr>
@@ -117,8 +119,7 @@ const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
                     <td className="px-5 py-3"><span className="inline-block bg-brand-blue text-slate-700 text-xs font-medium px-2.5 py-1 rounded-full">{s.class}</span></td>
                     <td className="px-5 py-3 text-slate-600">{s.department}</td>
                     <td className="px-5 py-3 capitalize text-slate-600">{s.gender}</td>
-                    <td className="px-5 py-3 text-slate-600">{s.parent_name}</td>
-                    <td className="px-5 py-3 text-slate-600">{s.parent_phone}</td>
+<td className="px-5 py-3 text-slate-600 font-mono tracking-widest">{s.pin || "-"}</td>
                     <td className="px-5 py-3">
                       <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (s.verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}>
                         {s.verified ? "✓ Verified" : "⚠ Not Verified"}

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 const STATES = ["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"];
 const BRANCHES = ["School", "College", "Tutorial"];
+const LOCATIONS = ["Shomolu", "Ikorodu"];
 const DEPARTMENTS = ["Art", "Science", "Commercial"];
 
 function Field({ label, children, hint }) {
@@ -35,7 +36,7 @@ export default function AddTeacher() {
 
   const [form, setForm] = useState({
     full_name: "", gender: "male", state_of_origin: "",
-    branch: "", department: "", subject: "", qualification: "",
+    branch: "", location: "", department: "", subject: "", qualification: "",
     phone: "", email: "", address: "",
   });
 
@@ -103,13 +104,15 @@ export default function AddTeacher() {
     e.preventDefault();
     setError("");
 
-    if (!form.full_name || !form.branch) {
-      setError("Full name and branch are required.");
+    if (!form.full_name || !form.branch || !form.location) {
+      setError("Full name, branch, and location are required.");
       return;
     }
 
     setSaving(true);
     let photo_url = null;
+    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const staffId = "SSS-STAFF/" + new Date().getFullYear() + "/" + Math.floor(1000 + Math.random() * 9000);
 
     if (photoFile) {
       const fileExt = photoFile.name.split(".").pop();
@@ -124,7 +127,7 @@ export default function AddTeacher() {
       photo_url = urlData.publicUrl;
     }
 
-    const { error: insertError } = await supabase.from("teachers").insert([{ ...form, photo_url }]);
+    const { data: inserted, error: insertError } = await supabase.from("teachers").insert([{ ...form, photo_url, pin, staff_id: staffId }]).select().single();
     setSaving(false);
 
     if (insertError) {
@@ -132,7 +135,7 @@ export default function AddTeacher() {
       return;
     }
 
-    router.push("/admin-dashboard/teachers");
+    router.push("/admin-dashboard/teachers/view/" + inserted.id + "?newpin=" + pin);
   }
 
   return (
@@ -207,6 +210,12 @@ export default function AddTeacher() {
               <select value={form.branch} onChange={(e) => updateField("branch", e.target.value)} className={inputClass}>
                 <option value="">Select branch</option>
                 {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </Field>
+            <Field label="Location">
+              <select value={form.location} onChange={(e) => updateField("location", e.target.value)} className={inputClass}>
+                <option value="">Select location</option>
+                {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </Field>
             <Field label="Department (optional)">

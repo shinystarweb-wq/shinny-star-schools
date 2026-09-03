@@ -10,6 +10,7 @@ const CLASSES_BY_BRANCH = {
   Tutorial: ["JSS 1", "JSS 2", "JSS 3", "SSS 1", "SSS 2", "SSS 3", "WAEC", "NECO", "GCE", "JUPEB", "SAT", "TOEFL", "IELTS", "JAMB"],
 };
 const BRANCHES = ["School", "College", "Tutorial"];
+const LOCATIONS = ["Shomolu", "Ikorodu"];
 const DEPARTMENTS = ["Art", "Science", "Commercial"];
 
 function Field({ label, children, hint }) {
@@ -40,7 +41,8 @@ export default function AddStudent() {
 
   const [form, setForm] = useState({
     full_name: "", date_of_birth: "", gender: "male", state_of_origin: "",
-    class: "", branch: "", department: "", parent_name: "", parent_phone: "",
+    class: "", branch: "", location: "", department: "", parent_name: "", parent_phone: "",
+    guardian_email: "", guardian_whatsapp: "",
     address: "", medical_note: "",
   });
 
@@ -108,13 +110,15 @@ export default function AddStudent() {
     e.preventDefault();
     setError("");
 
-    if (!form.full_name || !form.class) {
-      setError("Full name and class are required.");
+    if (!form.full_name || !form.class || !form.location) {
+      setError("Full name, class, and location are required.");
       return;
     }
 
     setSaving(true);
     let photo_url = null;
+const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const regNumber = "SSS/" + new Date().getFullYear() + "/" + Math.floor(1000 + Math.random() * 9000);
 
     if (photoFile) {
       const fileExt = photoFile.name.split(".").pop();
@@ -129,7 +133,7 @@ export default function AddStudent() {
       photo_url = urlData.publicUrl;
     }
 
-    const { error: insertError } = await supabase.from("students").insert([{ ...form, photo_url }]);
+    const { data: inserted, error: insertError } = await supabase.from("students").insert([{ ...form, photo_url, pin, reg_number: regNumber }]).select().single();
     setSaving(false);
 
     if (insertError) {
@@ -137,7 +141,7 @@ export default function AddStudent() {
       return;
     }
 
-    router.push("/admin-dashboard/students");
+    router.push("/admin-dashboard/students/view/" + inserted.id + "?newpin=" + pin);
   }
 
   return (
@@ -217,6 +221,12 @@ export default function AddStudent() {
                 {BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </Field>
+            <Field label="Location">
+              <select value={form.location} onChange={(e) => updateField("location", e.target.value)} className={inputClass}>
+                <option value="">Select location</option>
+                {LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </Field>
             <Field label="Class">
               <select value={form.class} onChange={(e) => updateField("class", e.target.value)} disabled={!form.branch} className={inputClass + (!form.branch ? " opacity-50 cursor-not-allowed" : "")}>
                 <option value="">{form.branch ? "Select class" : "Select branch first"}</option>
@@ -240,6 +250,12 @@ export default function AddStudent() {
             </Field>
             <Field label="Parent/Guardian Phone">
               <input type="text" value={form.parent_phone} onChange={(e) => updateField("parent_phone", e.target.value)} className={inputClass} />
+            </Field>
+            <Field label="Guardian Email (optional)" hint="Attendance notifications will be emailed here if provided.">
+              <input type="email" value={form.guardian_email} onChange={(e) => updateField("guardian_email", e.target.value)} placeholder="parent@example.com" className={inputClass} />
+            </Field>
+            <Field label="Guardian WhatsApp Number (optional)" hint="Leave blank if the guardian's number isn't on WhatsApp.">
+              <input type="text" value={form.guardian_whatsapp} onChange={(e) => updateField("guardian_whatsapp", e.target.value)} placeholder="e.g. 2348012345678" className={inputClass} />
             </Field>
           </div>
           <div className="flex flex-col gap-5">

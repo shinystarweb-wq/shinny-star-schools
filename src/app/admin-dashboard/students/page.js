@@ -17,8 +17,14 @@ export default function StudentsPage() {
   useEffect(() => {
     async function loadCounts() {
       setLoading(true);
+      const stored = sessionStorage.getItem("shinnystar_user");
+      const location = stored ? JSON.parse(stored).location : null;
       const results = await Promise.all(
-        SECTIONS.map((s) => supabase.from("students").select("id", { count: "exact", head: true }).eq("branch", s.key))
+        SECTIONS.map((s) => {
+          let q = supabase.from("students").select("id", { count: "exact", head: true }).eq("branch", s.key);
+          if (location) q = q.eq("location", location);
+          return q;
+        })
       );
       const newCounts = {};
       let total = 0;

@@ -24,7 +24,10 @@ export default function BranchTeachersPage() {
       setLoading(true);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
+      const stored = sessionStorage.getItem("shinnystar_user");
+      const location = stored ? JSON.parse(stored).location : null;
       let query = supabase.from("teachers").select("*", { count: "exact" }).eq("branch", branchLabel).order("full_name").range(from, to);
+      if (location) query = query.eq("location", location);
       if (search.trim()) query = query.ilike("full_name", "%" + search.trim() + "%");
       if (departmentFilter) query = query.eq("department", departmentFilter);
       if (genderFilter) query = query.eq("gender", genderFilter);
@@ -83,7 +86,7 @@ export default function BranchTeachersPage() {
                   <th className="text-left px-5 py-3 font-semibold">Subject</th>
                   <th className="text-left px-5 py-3 font-semibold">Department</th>
                   <th className="text-left px-5 py-3 font-semibold">Gender</th>
-                  <th className="text-left px-5 py-3 font-semibold">Phone</th>
+                  <th className="text-left px-5 py-3 font-semibold">PIN</th>
                   <th className="text-left px-5 py-3 font-semibold">Status</th>
                   <th className="px-5 py-3"></th>
                 </tr>
@@ -104,7 +107,7 @@ export default function BranchTeachersPage() {
                     <td className="px-5 py-3 text-slate-600">{t.subject}</td>
                     <td className="px-5 py-3 text-slate-600">{t.department}</td>
                     <td className="px-5 py-3 capitalize text-slate-600">{t.gender}</td>
-                    <td className="px-5 py-3 text-slate-600">{t.phone}</td>
+                    <td className="px-5 py-3 text-slate-600 font-mono tracking-widest">{t.pin || "-"}</td>
                     <td className="px-5 py-3">
                       <span className={"text-xs font-semibold px-2.5 py-1 rounded-full " + (t.verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}>
                         {t.verified ? "✓ Verified" : "⚠ Not Verified"}

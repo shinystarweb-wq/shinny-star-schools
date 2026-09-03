@@ -17,14 +17,22 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function loadStats() {
       const today = new Date().toISOString().split("T")[0];
+      const stored = sessionStorage.getItem("shinnystar_user");
+      const location = stored ? JSON.parse(stored).location : null;
 
-      const [studentsRes, teachersRes, classesRes, examsRes, attendanceRes] = await Promise.all([
-        supabase.from("students").select("id", { count: "exact", head: true }),
-        supabase.from("teachers").select("id", { count: "exact", head: true }),
-        supabase.from("students").select("class"),
-        supabase.from("exams").select("id", { count: "exact", head: true }).gte("exam_date", today),
-        supabase.from("attendance").select("status").eq("attendance_date", today),
+      const { data: locationStudents } = await supabase.from("students").select("id, class").eq("location", location);
+      const locationStudentIds = (locationStudents || []).map((s) => s.id);
+
+      const [studentsRes, teachersRes, examsRes, attendanceRes] = await Promise.all([
+        supabase.from("students").select("id", { count: "exact", head: true }).eq("location", location),
+        supabase.from("teachers").select("id", { count: "exact", head: true }).eq("location", location),
+        supabase.from("exams").select("id", { count: "exact", head: true }).eq("location", location).gte("exam_date", today),
+        locationStudentIds.length > 0
+          ? supabase.from("attendance").select("status").eq("attendance_date", today).in("student_id", locationStudentIds)
+          : Promise.resolve({ data: [] }),
       ]);
+
+      const classesRes = { data: locationStudents };
 
       const uniqueClasses = new Set((classesRes.data || []).map((s) => s.class));
       const attendanceRows = attendanceRes.data || [];
