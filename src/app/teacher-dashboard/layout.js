@@ -26,18 +26,34 @@ export default function TeacherLayout({ children }) {
     router.push("/login");
   }
 
-  const links = [
+  const baseLinks = [
     { href: "/teacher-dashboard", label: "Dashboard" },
     { href: "/teacher-dashboard/profile", label: "Profile" },
+    { href: "/teacher-dashboard/my-attendance", label: "My Attendance" },
+    { href: "/teacher-dashboard/notices", label: "Notices" },
+  ];
+
+  const academicLinks = [
     { href: "/teacher-dashboard/students", label: "Students" },
     { href: "/teacher-dashboard/classes", label: "Classes" },
     { href: "/teacher-dashboard/attendance", label: "Mark Attendance" },
-    { href: "/teacher-dashboard/my-attendance", label: "My Attendance" },
     { href: "/teacher-dashboard/exams", label: "Exams" },
     { href: "/teacher-dashboard/results", label: "Results" },
     { href: "/teacher-dashboard/lesson-notes", label: "Lesson Notes" },
-    { href: "/teacher-dashboard/notices", label: "Notices" },
+    { href: "/teacher-dashboard/assignments", label: "Assignments" },
   ];
+
+  const financeLinks = [
+    { href: "/teacher-dashboard/fees", label: "Fees" },
+  ];
+
+  const teacherRole = teacher?.teacherRole || "teacher";
+  let links = [];
+  if (teacherRole === "bursar") {
+    links = [...baseLinks, ...financeLinks];
+  } else {
+    links = [...baseLinks, ...academicLinks];
+  }
 
   if (!teacher) return <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Loading...</div>;
 
@@ -56,7 +72,10 @@ export default function TeacherLayout({ children }) {
           ))}
         </nav>
         <div className="p-4 border-t border-white/20">
-          <p className="text-xs text-white/70 mb-2">{teacher.full_name} • {teacher.branch}</p>
+          <p className="text-xs text-white/70 mb-1">{teacher.full_name} • {teacher.branch}</p>
+          {teacher.teacherRole && teacher.teacherRole !== "teacher" && (
+            <p className="text-[10px] uppercase tracking-wide text-white/50 mb-2">{teacher.teacherRole === "bursar" ? "Bursar" : "Sub Admin"}</p>
+          )}
           <button onClick={handleLogout} className="text-sm font-medium px-4 py-2 rounded-lg hover:bg-white/10 transition w-full text-left">Log Out</button>
         </div>
       </aside>

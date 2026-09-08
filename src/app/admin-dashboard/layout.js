@@ -40,6 +40,7 @@ export default function AdminLayout({ children }) {
         { href: "/admin-dashboard/exams", label: "Exams" },
         { href: "/admin-dashboard/results", label: "Results" },
         { href: "/admin-dashboard/lesson-notes", label: "Lesson Notes" },
+        { href: "/admin-dashboard/assignments", label: "Assignments" },
       ],
     },
     {

@@ -8,6 +8,12 @@ import * as faceapi from "face-api.js";
 const STATES = ["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"];
 const BRANCHES = ["School", "College", "Tutorial"];
 const DEPARTMENTS = ["Art", "Science", "Commercial"];
+const DEPARTMENT_OPTIONS = ["Art", "Science", "Commercial"];
+const ROLES = [
+  { key: "teacher", label: "Teacher" },
+  { key: "bursar", label: "Bursar" },
+  { key: "sub_admin", label: "Sub Admin" },
+];
 const inputClass = "w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong focus:border-transparent transition";
 
 function Field({ label, children }) {
@@ -36,6 +42,14 @@ export default function TeacherProfile() {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("");
+  const [classAssignments, setClassAssignments] = useState([]);
+  const [availableClasses, setAvailableClasses] = useState([]);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [newClass, setNewClass] = useState("");
+  const [newSubject, setNewSubject] = useState("");
+  const [newDepartment, setNewDepartment] = useState("");
+  const [savingAssignment, setSavingAssignment] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -47,13 +61,51 @@ export default function TeacherProfile() {
       if (!error) {
         setTeacher(data);
         setForm(data);
-        const { data: settingsData } = await supabase.from("school_settings").select("*").eq("location", data.location).single();
-        setSchoolSettings(settingsData);
+        await loadAssignments(data);
       }
       setLoading(false);
     }
     loadTeacher();
   }, [id]);
+
+  async function loadAssignments(teacherData) {
+    const [assignRes, classRes, subjectRes] = await Promise.all([
+      supabase.from("teacher_class_assignments").select("*").eq("teacher_id", id).order("class"),
+      supabase.from("classes").select("name").eq("branch", teacherData.branch).eq("location", teacherData.location).order("name"),
+      supabase.from("subjects").select("name").eq("branch", teacherData.branch).eq("location", teacherData.location).order("name"),
+    ]);
+    setClassAssignments(assignRes.data || []);
+    setAvailableClasses((classRes.data || []).map((c) => c.name));
+    setAvailableSubjects((subjectRes.data || []).map((s) => s.name));
+  }
+
+  async function updateRole(newRole) {
+    setSavingRole(true);
+    const { error } = await supabase.from("teachers").update({ role: newRole }).eq("id", id);
+    setSavingRole(false);
+    if (!error) setTeacher((prev) => ({ ...prev, role: newRole }));
+  }
+
+  async function addAssignment() {
+    if (!newClass) return;
+    setSavingAssignment(true);
+    const { error } = await supabase.from("teacher_class_assignments").insert([{
+      teacher_id: id, branch: teacher.branch, location: teacher.location,
+      class: newClass, subject: newSubject || null, department: newDepartment || null,
+    }]);
+    setSavingAssignment(false);
+    if (!error) {
+      setNewClass("");
+      setNewSubject("");
+      setNewDepartment("");
+      loadAssignments(teacher);
+    }
+  }
+
+  async function removeAssignment(assignmentId) {
+    await supabase.from("teacher_class_assignments").delete().eq("id", assignmentId);
+    loadAssignments(teacher);
+  }
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -204,6 +256,7 @@ export default function TeacherProfile() {
         <button onClick={() => setTab("profile")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (tab === "profile" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Profile</button>
         <button onClick={() => setTab("idcard")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (tab === "idcard" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>ID Card</button>
         <button onClick={() => setTab("verification")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (tab === "verification" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Face Verification</button>
+        <button onClick={() => setTab("access")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (tab === "access" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Role & Access</button>
       </div>
 
       {tab === "profile" && (
@@ -350,7 +403,68 @@ export default function TeacherProfile() {
             </div>
           )}
 
-          {scanStatus && <p className="text-sm text-slate-600 mt-4">{scanStatus}</p>}
+      {scanStatus && <p className="text-sm text-slate-600 mt-4">{scanStatus}</p>}
+        </div>
+      )}
+
+      {tab === "access" && (
+        <div className="flex flex-col gap-6">
+          <div className="border border-slate-200 rounded-2xl p-6">
+            <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-4">Role</h2>
+            <div className="flex gap-2">
+              {ROLES.map((r) => (
+                <button key={r.key} onClick={() => updateRole(r.key)} disabled={savingRole} className={"text-sm font-medium px-4 py-2 rounded-lg transition " + (teacher.role === r.key ? "bg-brand-blue-strong text-white" : "border border-slate-300 hover:bg-slate-50")}>{r.label}</button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              {teacher.role === "bursar" && "This teacher's portal will focus on Fees. Other academic pages stay hidden."}
+              {teacher.role === "sub_admin" && "This teacher gets broader access similar to admin, but Fees stays hidden."}
+              {teacher.role === "teacher" && "Standard teacher access, limited to their assigned classes and subjects below."}
+            </p>
+          </div>
+
+          <div className="border border-slate-200 rounded-2xl p-6">
+            <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-4">Assigned Classes & Subjects</h2>
+            <p className="text-xs text-slate-500 mb-4">Only these classes will be visible in this teacher's portal (Attendance, Results, Exams, Lesson Notes).</p>
+
+            {classAssignments.length === 0 ? (
+              <p className="text-xs text-slate-400 mb-4">No classes assigned yet.</p>
+            ) : (
+              <div className="flex flex-col gap-2 mb-4">
+                {classAssignments.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between bg-brand-blue rounded-lg px-4 py-2.5">
+                    <span className="text-sm text-slate-700 font-medium">{a.class}{a.department ? " • " + a.department : ""}{a.subject ? " • " + a.subject : " • All subjects"}</span>
+                    <button onClick={() => removeAssignment(a.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-end gap-3 flex-wrap">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Class</label>
+                <select value={newClass} onChange={(e) => setNewClass(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong">
+                  <option value="">Select class</option>
+                  {availableClasses.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Department (optional)</label>
+                <select value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong">
+                  <option value="">All departments</option>
+                  {DEPARTMENT_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Subject (optional)</label>
+                <select value={newSubject} onChange={(e) => setNewSubject(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong">
+                  <option value="">All subjects</option>
+                  {availableSubjects.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <button onClick={addAssignment} disabled={savingAssignment || !newClass} className="bg-brand-blue-strong text-white text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50">{savingAssignment ? "Adding..." : "Add Assignment"}</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

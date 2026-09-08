@@ -26,6 +26,7 @@ export default function StudentLayout({ children }) {
     { href: "/student-dashboard/attendance", label: "Attendance" },
     { href: "/student-dashboard/exams", label: "Exams" },
     { href: "/student-dashboard/lesson-notes", label: "Lesson Notes" },
+    { href: "/student-dashboard/assignments", label: "Assignments" },
     { href: "/student-dashboard/notices", label: "Notices" },
   ];
 

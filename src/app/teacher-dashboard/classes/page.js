@@ -17,8 +17,14 @@ export default function TeacherClassesPage() {
       const user = JSON.parse(stored);
       setBranch(user.branch);
 
-      const [classesRes, studentsRes, teachersRes] = await Promise.all([
-        supabase.from("classes").select("*").eq("branch", user.branch).order("name"),
+      const assignedClassNames = [...new Set((user.assignedClasses || []).map((a) => a.class))];
+
+      let classesRes = { data: [] };
+      if (assignedClassNames.length > 0) {
+        classesRes = await supabase.from("classes").select("*").eq("branch", user.branch).in("name", assignedClassNames).order("name");
+      }
+
+      const [studentsRes, teachersRes] = await Promise.all([
         supabase.from("students").select("class").eq("branch", user.branch),
         supabase.from("teachers").select("id, full_name").eq("branch", user.branch),
       ]);

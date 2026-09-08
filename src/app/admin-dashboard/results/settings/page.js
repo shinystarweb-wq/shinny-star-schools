@@ -28,12 +28,12 @@ export default function ClassSettingsPage() {
 
   useEffect(() => { loadData(); }, [branch]);
 
-  async function togglePosition(className) {
+  async function togglePosition(className, field) {
     const current = settingsMap[className];
-    const newValue = current ? !current.show_position : true;
+    const newValue = current ? !current[field] : true;
 
     const { data, error } = await supabase.from("class_settings")
-      .upsert([{ branch, class: className, session: SESSION, show_position: newValue }], { onConflict: "branch,class,session" })
+      .upsert([{ branch, class: className, session: SESSION, ...current, [field]: newValue }], { onConflict: "branch,class,session" })
       .select().single();
 
     if (!error) {
@@ -62,16 +62,23 @@ export default function ClassSettingsPage() {
       ) : (
         <div className="border border-slate-200 rounded-xl overflow-hidden">
           {classes.map((c, i) => {
-            const isOn = settingsMap[c.name]?.show_position || false;
+            const overallOn = settingsMap[c.name]?.show_position || false;
+            const subjectOn = settingsMap[c.name]?.show_subject_position || false;
             return (
-              <div key={c.id} className={"flex items-center justify-between px-5 py-4 " + (i !== 0 ? "border-t border-slate-200" : "")}>
-                <div>
-                  <p className="text-sm font-medium text-slate-800">{c.name}</p>
-                  <p className="text-xs text-slate-500">Show position (1st, 2nd, 3rd...) on report cards</p>
+              <div key={c.id} className={"px-5 py-4 " + (i !== 0 ? "border-t border-slate-200" : "")}>
+                <p className="text-sm font-medium text-slate-800 mb-3">{c.name}</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-slate-500">Overall class position (summary card)</p>
+                  <button onClick={() => togglePosition(c.name, "show_position")} className={"w-12 h-7 rounded-full transition-colors relative flex-shrink-0 " + (overallOn ? "bg-brand-blue-strong" : "bg-slate-200")}>
+                    <span className={"absolute top-1 w-5 h-5 rounded-full bg-white transition-all " + (overallOn ? "left-6" : "left-1")}></span>
+                  </button>
                 </div>
-                <button onClick={() => togglePosition(c.name)} className={"w-12 h-7 rounded-full transition-colors relative " + (isOn ? "bg-brand-blue-strong" : "bg-slate-200")}>
-                  <span className={"absolute top-1 w-5 h-5 rounded-full bg-white transition-all " + (isOn ? "left-6" : "left-1")}></span>
-                </button>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-500">Per-subject position (in subject table)</p>
+                  <button onClick={() => togglePosition(c.name, "show_subject_position")} className={"w-12 h-7 rounded-full transition-colors relative flex-shrink-0 " + (subjectOn ? "bg-brand-blue-strong" : "bg-slate-200")}>
+                    <span className={"absolute top-1 w-5 h-5 rounded-full bg-white transition-all " + (subjectOn ? "left-6" : "left-1")}></span>
+                  </button>
+                </div>
               </div>
             );
           })}

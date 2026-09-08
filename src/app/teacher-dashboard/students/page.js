@@ -16,13 +16,17 @@ export default function TeacherStudentsPage() {
       const user = JSON.parse(stored);
       setBranch(user.branch);
 
-      const [classesRes, studentsRes] = await Promise.all([
-        supabase.from("classes").select("*").eq("branch", user.branch).order("name"),
-        supabase.from("students").select("class").eq("branch", user.branch),
-      ]);
+      const assignedClassNames = [...new Set((user.assignedClasses || []).map((a) => a.class))];
+
+      let classesRes = { data: [] };
+      if (assignedClassNames.length > 0) {
+        classesRes = await supabase.from("classes").select("*").eq("branch", user.branch).in("name", assignedClassNames).order("name");
+      }
+
+      const { data: studentsRes } = await supabase.from("students").select("class").eq("branch", user.branch);
 
       const c = {};
-      (studentsRes.data || []).forEach((s) => { c[s.class] = (c[s.class] || 0) + 1; });
+      (studentsRes || []).forEach((s) => { c[s.class] = (c[s.class] || 0) + 1; });
       setClasses(classesRes.data || []);
       setCounts(c);
       setLoading(false);

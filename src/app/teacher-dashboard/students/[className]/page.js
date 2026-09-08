@@ -19,7 +19,11 @@ export default function TeacherClassStudentsPage() {
       const user = JSON.parse(stored);
       setBranch(user.branch);
 
-      const { data } = await supabase.from("students").select("*").eq("branch", user.branch).eq("class", className).order("full_name");
+      const assignedDepartments = [...new Set((user.assignedClasses || []).filter((a) => a.class === className && a.department).map((a) => a.department))];
+
+      let query = supabase.from("students").select("*").eq("branch", user.branch).eq("class", className);
+      if (assignedDepartments.length > 0) query = query.in("department", assignedDepartments);
+      const { data } = await query.order("full_name");
       setStudents(data || []);
       setLoading(false);
     }

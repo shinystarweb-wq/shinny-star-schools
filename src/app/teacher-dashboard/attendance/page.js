@@ -103,9 +103,17 @@ function RemarkTab({ branch }) {
 
   async function loadClassCards(d) {
     setLoadingClasses(true);
-    const { data: classes } = await supabase.from("classes").select("*").eq("branch", branch).order("name");
+    const stored = sessionStorage.getItem("shinnystar_user");
+    const user = stored ? JSON.parse(stored) : null;
+    const assignedClassNames = [...new Set((user?.assignedClasses || []).map((a) => a.class))];
+
+    let classes = [];
+    if (assignedClassNames.length > 0) {
+      const { data } = await supabase.from("classes").select("*").eq("branch", branch).in("name", assignedClassNames).order("name");
+      classes = data || [];
+    }
     const cards = [];
-    for (const c of classes || []) {
+    for (const c of classes) {
       const { data: students } = await supabase.from("students").select("id").eq("branch", branch).eq("class", c.name);
       const ids = (students || []).map((s) => s.id);
       let present = 0, late = 0, absent = 0;

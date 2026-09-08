@@ -53,15 +53,22 @@ export default function Login() {
       const { data: teachers } = await supabase.from("teachers").select("*").eq("pin", cleanPin);
       const match = (teachers || []).find((t) => t.full_name.trim().split(" ").pop().toLowerCase() === cleanUsername);
 
-      setLoading(false);
-
       if (!match) {
+        setLoading(false);
         setError("Invalid username or PIN.");
         return;
       }
 
+      const { data: assignments } = await supabase.from("teacher_class_assignments").select("*").eq("teacher_id", match.id);
+
+      setLoading(false);
+
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("shinnystar_user", JSON.stringify({ id: match.id, role: "teacher", username: cleanUsername, branch: match.branch, location: match.location, full_name: match.full_name }));
+        sessionStorage.setItem("shinnystar_user", JSON.stringify({
+          id: match.id, role: "teacher", username: cleanUsername, branch: match.branch, location: match.location,
+          full_name: match.full_name, teacherRole: match.role || "teacher",
+          assignedClasses: (assignments || []).map((a) => ({ class: a.class, subject: a.subject, department: a.department })),
+        }));
       }
       router.push("/teacher-dashboard");
       return;
