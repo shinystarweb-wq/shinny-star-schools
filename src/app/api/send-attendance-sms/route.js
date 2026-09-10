@@ -17,7 +17,7 @@ export async function POST(request) {
     formattedNumber = formattedNumber.slice(1);
   }
 
-  const message = studentName + " was marked ABSENT today (" + date + ") at Shinny Star Schools, " + className + ". Please contact the school if this is unexpected.";
+  const message = studentName + " was marked ABSENT today (" + date + ") at Shiny Star Schools, " + className + ". Please contact the school if this is unexpected.";
 
   try {
     const response = await fetch("https://api.ng.termii.com/api/sms/send", {

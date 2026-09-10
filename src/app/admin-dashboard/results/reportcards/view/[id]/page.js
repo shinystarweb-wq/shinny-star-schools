@@ -161,11 +161,11 @@ export default function ReportCardPage() {
           ) : (
             <div className="w-14 h-14 rounded-full bg-brand-blue flex items-center justify-center text-2xl mx-auto mb-2">🏫</div>
           )}
-          <h1 className="text-xl font-bold text-slate-800 tracking-wide">{schoolSettings?.school_name || "SHINNY STAR SCHOOLS"}</h1>
+          <h1 className="text-xl font-bold text-slate-800 tracking-wide">{schoolSettings?.school_name || "SHINY STAR SCHOOLS"}</h1>
           <p className="text-xs text-slate-500 uppercase tracking-wider">{student.branch} Section — Student Report Card</p>
           {schoolSettings?.address && <p className="text-xs text-slate-400 mt-1">{schoolSettings.address}</p>}
           <p className="text-xs text-slate-400">{[schoolSettings?.phone, schoolSettings?.email].filter(Boolean).join(" • ")}</p>
-          <p className="text-xs text-slate-400">{schoolSettings?.website || "shinnystarschools.com.ng"}</p>
+          <p className="text-xs text-slate-400">{schoolSettings?.website || "shinystar.com.ng"}</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">

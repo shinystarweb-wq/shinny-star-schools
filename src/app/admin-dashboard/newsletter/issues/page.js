@@ -7,7 +7,7 @@ const inputClass = "w-full border border-slate-300 rounded-lg px-4 py-2.5 text-s
 
 export default function NewsletterIssuePage() {
   const [schoolSettings, setSchoolSettings] = useState(null);
-  const [title, setTitle] = useState("Shinny Star Times");
+  const [title, setTitle] = useState("Shiny Star Times");
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [intro, setIntro] = useState("");
   const [events, setEvents] = useState([]);
@@ -116,7 +116,7 @@ export default function NewsletterIssuePage() {
               <div className="w-16 h-16 rounded-full bg-brand-blue flex items-center justify-center text-3xl mx-auto mb-2">🏫</div>
             )}
             <h1 className="text-3xl font-bold text-slate-800 tracking-wide">{title}</h1>
-            <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">{schoolSettings?.school_name || "Shinny Star Schools"} Newsletter</p>
+            <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">{schoolSettings?.school_name || "Shiny Star Schools"} Newsletter</p>
             <p className="text-xs text-slate-400 mt-1">{new Date(issueDate + "T00:00:00").toLocaleDateString("default", { year: "numeric", month: "long", day: "numeric" })}</p>
           </div>
 

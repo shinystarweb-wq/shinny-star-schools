@@ -74,7 +74,7 @@ export default function StudentProfilePage() {
               <div className="absolute -bottom-14 -right-10 w-32 h-32 rounded-full bg-white/10"></div>
               <div className="text-center relative z-10 flex flex-col items-center">
                 <div className="w-12 h-12 rounded-full bg-white/20 border border-white/40 flex items-center justify-center mb-2 text-lg">🏫</div>
-                <p className="font-bold tracking-wide text-sm leading-tight">SHINNY STAR SCHOOLS</p>
+                <p className="font-bold tracking-wide text-sm leading-tight">SHINY STAR SCHOOLS</p>
                 <p className="text-[10px] text-white/70 mt-1 uppercase tracking-wider">Identity Card</p>
               </div>
               <img src={qrUrl} alt="QR Code" className="w-24 h-24 rounded-lg bg-white p-1.5 relative z-10" />
@@ -105,7 +105,7 @@ export default function StudentProfilePage() {
               </div>
               <div className="border-t border-dashed border-slate-200 mt-5 pt-3 flex items-center justify-between">
                 <p className="text-[10px] text-slate-400">ID: {student.id.slice(0, 8).toUpperCase()}</p>
-                <p className="text-[10px] text-slate-400">shinnystarschools.com.ng</p>
+                <p className="text-[10px] text-slate-400">shinystar.com.ng</p>
               </div>
             </div>
           </div>

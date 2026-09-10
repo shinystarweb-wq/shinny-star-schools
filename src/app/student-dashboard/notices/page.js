@@ -84,7 +84,7 @@ function PrintModal({ notice, onClose }) {
         <div id="notice-print-area" className="p-8">
           <div className="text-center border-b-2 border-brand-blue-strong pb-4 mb-6">
             <div className="w-14 h-14 rounded-full bg-brand-blue flex items-center justify-center text-2xl mx-auto mb-2">🏫</div>
-            <h1 className="text-xl font-bold text-slate-800 tracking-wide">SHINNY STAR SCHOOLS</h1>
+            <h1 className="text-xl font-bold text-slate-800 tracking-wide">SHINY STAR SCHOOLS</h1>
             <p className="text-xs text-slate-500 uppercase tracking-wider">Official Notice</p>
           </div>
           <div className="flex items-center justify-between mb-4">

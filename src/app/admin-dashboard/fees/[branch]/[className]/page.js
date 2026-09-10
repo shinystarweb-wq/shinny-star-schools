@@ -160,7 +160,7 @@ export default function ClassFeesPage() {
           ) : (
             <div className="w-14 h-14 rounded-full bg-brand-blue flex items-center justify-center text-2xl mx-auto mb-2">🏫</div>
           )}
-          <h1 className="text-xl font-bold text-slate-800">{schoolSettings?.school_name || "SHINNY STAR SCHOOLS"}</h1>
+          <h1 className="text-xl font-bold text-slate-800">{schoolSettings?.school_name || "SHINY STAR SCHOOLS"}</h1>
           <p className="text-sm text-slate-500">{branch} Section — {className} Fee Statement, {term} {schoolSettings?.current_session || SESSION}</p>
           {schoolSettings?.address && <p className="text-xs text-slate-400 mt-1">{schoolSettings.address}</p>}
           <p className="text-xs text-slate-400">{[schoolSettings?.phone, schoolSettings?.email].filter(Boolean).join(" • ")}</p>

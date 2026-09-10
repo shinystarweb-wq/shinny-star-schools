@@ -9,8 +9,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 export const metadata = {
-  title: "Shinny Star Schools",
-  description: "School management system for Shinny Star Schools",
+  title: "Shiny Star Schools",
+  description: "School management system for Shiny Star Schools",
   manifest: "/manifest.json",
 };
 export const viewport = {

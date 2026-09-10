@@ -11,16 +11,16 @@ export async function POST(request) {
 
   const statusText = status === "present" ? "present" : status === "late" ? "late" : "absent";
   const statusColor = status === "present" ? "#16a34a" : status === "late" ? "#d97706" : "#dc2626";
-  const subject = studentName + " marked " + statusText + " today — Shinny Star Schools";
+  const subject = studentName + " marked " + statusText + " today — Shiny Star Schools";
 
   try {
     await resend.emails.send({
-      from: "Shinny Star Schools <onboarding@resend.dev>",
+      from: "Shiny Star Schools <onboarding@resend.dev>",
       to: guardianEmail,
       subject,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
-          <h2 style="color: #1e293b; margin-bottom: 4px;">Shinny Star Schools</h2>
+          <h2 style="color: #1e293b; margin-bottom: 4px;">Shiny Star Schools</h2>
           <p style="color: #64748b; font-size: 13px; margin-top: 0;">Attendance Notification</p>
           <div style="background: #eaf4fd; border-radius: 10px; padding: 16px; margin: 16px 0;">
             <p style="margin: 0; color: #1e293b;">
@@ -29,7 +29,7 @@ export async function POST(request) {
               on ${date}.
             </p>
           </div>
-          <p style="color: #94a3b8; font-size: 12px;">This is an automated message from Shinny Star Schools. Please do not reply to this email.</p>
+          <p style="color: #94a3b8; font-size: 12px;">This is an automated message from Shiny Star Schools. Please do not reply to this email.</p>
         </div>
       `,
     });

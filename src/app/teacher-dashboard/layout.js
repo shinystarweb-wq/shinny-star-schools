@@ -61,7 +61,7 @@ export default function TeacherLayout({ children }) {
     <div className="min-h-screen flex bg-white">
       <aside className="w-64 bg-brand-blue-strong text-white flex-shrink-0 border-r border-white/10 flex flex-col">
         <div className="px-6 py-5 border-b border-white/20">
-          <h2 className="font-bold text-lg tracking-wide">SHINNY STAR</h2>
+          <h2 className="font-bold text-lg tracking-wide">SHINY STAR</h2>
           <p className="text-xs text-white/70">Teacher Portal</p>
         </div>
         <nav className="flex flex-col p-4 gap-1 flex-1">

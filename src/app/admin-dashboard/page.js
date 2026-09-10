@@ -63,7 +63,7 @@ export default function AdminDashboard() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-1">Overview</h1>
-      <p className="text-slate-500 text-sm mb-8">Welcome back. Here's what's happening at Shinny Star Schools today.</p>
+      <p className="text-slate-500 text-sm mb-8">Welcome back. Here's what's happening at Shiny Star Schools today.</p>
 
       {loading ? (
         <p className="text-slate-500 text-sm">Loading dashboard...</p>
