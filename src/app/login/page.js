@@ -96,7 +96,7 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-brand-blue flex items-center justify-center px-6">
       <div className="bg-white rounded-2xl shadow-md w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold text-center text-slate-800 mb-1">SHINNY STAR SCHOOLS</h1>
+        <h1 className="text-2xl font-bold text-center text-slate-800 mb-1">SHINY STAR SCHOOLS</h1>
         <p className="text-center text-slate-500 text-sm mb-6">Select your portal to sign in</p>
 
         <div className="flex bg-brand-blue rounded-lg p-1 mb-6">
