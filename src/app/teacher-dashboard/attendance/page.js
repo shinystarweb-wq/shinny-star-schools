@@ -9,30 +9,182 @@ function todayStr() {
 }
 
 export default function TeacherAttendancePage() {
-  const [branch, setBranch] = useState("");
+  const [teacher, setTeacher] = useState(null);
   const [topTab, setTopTab] = useState("overview");
 
   useEffect(() => {
     const stored = sessionStorage.getItem("shinnystar_user");
-    if (stored) setBranch(JSON.parse(stored).branch);
+    if (stored) setTeacher(JSON.parse(stored));
   }, []);
 
-  if (!branch) return <p className="text-slate-500 text-sm">Loading...</p>;
+  if (!teacher) return <p className="text-slate-500 text-sm">Loading...</p>;
+
+  const isSchool = teacher.branch === "School";
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-1">Attendance</h1>
-      <p className="text-sm text-slate-500 mb-6">{branch} Section</p>
+      <p className="text-sm text-slate-500 mb-6">{teacher.branch} Section</p>
 
-      <div className="flex gap-2 border-b border-slate-200 mb-6">
-        <button onClick={() => setTopTab("overview")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (topTab === "overview" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Overview</button>
-        <button onClick={() => setTopTab("remark")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (topTab === "remark" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Remark</button>
-        <button onClick={() => setTopTab("mark")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (topTab === "mark" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Mark Attendance</button>
+      {isSchool ? (
+        <>
+          <div className="flex gap-2 border-b border-slate-200 mb-6">
+            <button onClick={() => setTopTab("overview")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (topTab === "overview" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Overview</button>
+            <button onClick={() => setTopTab("remark")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (topTab === "remark" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Remark</button>
+            <button onClick={() => setTopTab("mark")} className={"px-4 py-2 text-sm font-medium border-b-2 -mb-px " + (topTab === "mark" ? "border-brand-blue-strong text-brand-blue-strong" : "border-transparent text-slate-500")}>Mark Attendance</button>
+          </div>
+          {topTab === "overview" && <OverviewTab branch={teacher.branch} />}
+          {topTab === "remark" && <RemarkTab branch={teacher.branch} />}
+          {topTab === "mark" && <MarkTab branch={teacher.branch} />}
+        </>
+      ) : (
+        <SubjectAttendanceTab teacher={teacher} />
+      )}
+    </div>
+  );
+}
+
+function SubjectAttendanceTab({ teacher }) {
+  const [step, setStep] = useState("select");
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [date] = useState(todayStr());
+  const [students, setStudents] = useState([]);
+  const [statusMap, setStatusMap] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const assignments = teacher.assignedClasses || [];
+  const uniqueClasses = [...new Set(assignments.map((a) => a.class))];
+
+  function subjectsForClass(className) {
+    return [...new Set(assignments.filter((a) => a.class === className && a.subject).map((a) => a.subject))];
+  }
+
+  async function loadRoster() {
+    setLoading(true);
+    setMessage("");
+
+    const assignmentForClass = assignments.find((a) => a.class === selectedClass && a.department);
+    let query = supabase.from("students").select("id, full_name, photo_url, department")
+      .eq("branch", teacher.branch).eq("class", selectedClass).eq("location", teacher.location);
+    if (assignmentForClass) query = query.eq("department", assignmentForClass.department);
+
+    const { data: studentData } = await query.order("full_name");
+    const ids = (studentData || []).map((s) => s.id);
+
+    let existing = [];
+    if (ids.length > 0) {
+      const { data } = await supabase.from("subject_attendance").select("student_id, status")
+        .eq("subject", selectedSubject).eq("class", selectedClass).eq("attendance_date", date).in("student_id", ids);
+      existing = data || [];
+    }
+
+    const initial = {};
+    (studentData || []).forEach((s) => {
+      const found = existing.find((e) => e.student_id === s.id);
+      initial[s.id] = found ? found.status : "absent";
+    });
+
+    setStudents(studentData || []);
+    setStatusMap(initial);
+    setLoading(false);
+    setStep("roster");
+  }
+
+  function toggleStatus(studentId) {
+    setStatusMap((prev) => ({ ...prev, [studentId]: prev[studentId] === "present" ? "absent" : "present" }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setMessage("");
+    const rows = students.map((s) => ({
+      student_id: s.id, teacher_id: teacher.id, branch: teacher.branch, location: teacher.location,
+      class: selectedClass, subject: selectedSubject, attendance_date: date, status: statusMap[s.id] || "absent",
+    }));
+    const { error } = await supabase.from("subject_attendance").upsert(rows, { onConflict: "student_id,subject,attendance_date" });
+    setSaving(false);
+    setMessage(error ? "Could not save: " + error.message : "Attendance saved for " + selectedSubject + ", " + selectedClass + ".");
+  }
+
+  const presentCount = students.filter((s) => statusMap[s.id] === "present").length;
+
+  if (uniqueClasses.length === 0) {
+    return (
+      <div className="border border-dashed border-slate-300 rounded-xl py-16 text-center">
+        <p className="text-slate-500 text-sm">You haven't been assigned to any classes yet. Contact your admin.</p>
       </div>
+    );
+  }
 
-      {topTab === "overview" && <OverviewTab branch={branch} />}
-      {topTab === "remark" && <RemarkTab branch={branch} />}
-      {topTab === "mark" && <MarkTab branch={branch} />}
+  return (
+    <div>
+      {step === "roster" && (
+        <button onClick={() => setStep("select")} className="text-sm text-brand-blue-strong font-medium mb-5 inline-block hover:underline">← Change Class/Subject</button>
+      )}
+
+      {step === "select" && (
+        <div className="border border-slate-200 rounded-2xl p-6 max-w-lg">
+          <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-4">Select Class & Subject</h2>
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Class</label>
+              <select value={selectedClass} onChange={(e) => { setSelectedClass(e.target.value); setSelectedSubject(""); }} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong">
+                <option value="">Select class</option>
+                {uniqueClasses.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Subject</label>
+              <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)} disabled={!selectedClass} className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong disabled:opacity-50">
+                <option value="">Select subject</option>
+                {subjectsForClass(selectedClass).map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <button onClick={loadRoster} disabled={!selectedClass || !selectedSubject || loading} className="self-start bg-brand-blue-strong text-white px-5 py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-50">{loading ? "Loading..." : "Continue"}</button>
+          </div>
+        </div>
+      )}
+
+      {step === "roster" && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-slate-800">{selectedSubject} — {selectedClass}</h2>
+              <p className="text-xs text-slate-500">{date} • {presentCount} of {students.length} present</p>
+            </div>
+          </div>
+
+          {students.length === 0 ? (
+            <div className="border border-dashed border-slate-300 rounded-xl py-16 text-center"><p className="text-slate-500 text-sm">No students found for this class.</p></div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2 mb-5">
+                {students.map((s) => {
+                  const isPresent = statusMap[s.id] === "present";
+                  return (
+                    <button key={s.id} onClick={() => toggleStatus(s.id)} className={"flex items-center justify-between border rounded-xl px-4 py-3 transition text-left " + (isPresent ? "border-green-300 bg-green-50" : "border-slate-200 hover:bg-slate-50")}>
+                      <div className="flex items-center gap-3">
+                        {s.photo_url ? (
+                          <img src={s.photo_url} alt={s.full_name} className="w-9 h-9 rounded-full object-cover ring-2 ring-brand-blue" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-brand-blue flex items-center justify-center text-xs font-semibold text-brand-blue-strong">{s.full_name.charAt(0)}</div>
+                        )}
+                        <span className="font-medium text-slate-800">{s.full_name}</span>
+                      </div>
+                      <span className={"text-xs font-semibold px-3 py-1.5 rounded-full " + (isPresent ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500")}>{isPresent ? "✓ Present" : "Absent"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {message && <p className="text-sm text-slate-600 mb-3">{message}</p>}
+              <button onClick={handleSave} disabled={saving} className="bg-brand-blue-strong text-white px-8 py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">{saving ? "Saving..." : "Save Attendance"}</button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -390,9 +542,10 @@ function MarkTab({ branch }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2">
-        <div className="flex gap-2 mb-5 bg-slate-100 p-1.5 rounded-xl w-fit">
+        <div className="flex gap-2 mb-5 bg-slate-100 p-1.5 rounded-xl w-fit flex-wrap">
           <button onClick={() => switchMethod("face")} className={"text-sm font-medium px-4 py-2 rounded-lg transition " + (method === "face" ? "bg-white text-brand-blue-strong shadow-sm" : "text-slate-500")}>📷 Face Scan</button>
           <button onClick={() => switchMethod("qr")} className={"text-sm font-medium px-4 py-2 rounded-lg transition " + (method === "qr" ? "bg-white text-brand-blue-strong shadow-sm" : "text-slate-500")}>▦ ID Card / QR</button>
+          <button onClick={() => switchMethod("list")} className={"text-sm font-medium px-4 py-2 rounded-lg transition " + (method === "list" ? "bg-white text-brand-blue-strong shadow-sm" : "text-slate-500")}>📋 List</button>
         </div>
 
         <div className="border border-slate-200 rounded-2xl p-6 bg-white">
@@ -436,6 +589,12 @@ function MarkTab({ branch }) {
             </div>
           )}
 
+          {method === "list" && (
+            <ListMarkPanel branch={branch} allStudents={allStudents} onMarked={(student) => {
+              setMarkedList((prev) => [{ ...student, time: new Date().toLocaleTimeString() }, ...prev]);
+            }} />
+          )}
+
           {scanMessage && <div className="mt-4 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">✓ {scanMessage}</div>}
         </div>
       </div>
@@ -459,6 +618,99 @@ function MarkTab({ branch }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+function ListMarkPanel({ branch, allStudents, onMarked }) {
+  const [classFilter, setClassFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusMap, setStatusMap] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const classOptions = [...new Set(allStudents.map((s) => s.class))].sort();
+  const filtered = allStudents.filter((s) => {
+    if (classFilter && s.class !== classFilter) return false;
+    if (search.trim() && !s.full_name.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    return true;
+  });
+
+  function toggleStatus(studentId) {
+    setStatusMap((prev) => ({ ...prev, [studentId]: prev[studentId] === "present" ? "absent" : "present" }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setMessage("");
+    const today = todayStr();
+    const marked = Object.entries(statusMap).filter(([, status]) => status);
+    if (marked.length === 0) {
+      setMessage("Mark at least one student first.");
+      setSaving(false);
+      return;
+    }
+
+    const rows = marked.map(([studentId, status]) => ({ student_id: studentId, attendance_date: today, status }));
+    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "student_id,attendance_date" });
+    setSaving(false);
+
+    if (error) {
+      setMessage("Could not save: " + error.message);
+      return;
+    }
+
+    marked.forEach(([studentId, status]) => {
+      if (status === "present") {
+        const student = allStudents.find((s) => s.id === studentId);
+        if (student) onMarked(student);
+      }
+    });
+
+    setMessage("Attendance saved for " + marked.length + " students.");
+    setStatusMap({});
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-3 mb-4">
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name..." className="flex-1 min-w-[180px] border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong" />
+        <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong">
+          <option value="">All Classes</option>
+          {classOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-10">No students found.</p>
+      ) : (
+        <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto mb-4">
+          {filtered.map((s) => {
+            const status = statusMap[s.id];
+            return (
+              <div key={s.id} className="flex items-center justify-between border border-slate-200 rounded-lg px-4 py-2.5">
+                <div className="flex items-center gap-3">
+                  {s.photo_url ? (
+                    <img src={s.photo_url} alt={s.full_name} className="w-8 h-8 rounded-full object-cover ring-2 ring-brand-blue" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-brand-blue flex items-center justify-center text-xs font-semibold text-brand-blue-strong">{s.full_name.charAt(0)}</div>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{s.full_name}</p>
+                    <p className="text-xs text-slate-400">{s.class}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => toggleStatus(s.id)} className={"text-xs font-medium px-3 py-1.5 rounded-full " + (status === "present" ? "bg-green-600 text-white" : "bg-slate-100 text-slate-600")}>Present</button>
+                  <button onClick={() => setStatusMap((prev) => ({ ...prev, [s.id]: prev[s.id] === "absent" ? undefined : "absent" }))} className={"text-xs font-medium px-3 py-1.5 rounded-full " + (status === "absent" ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600")}>Absent</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {message && <p className="text-sm text-slate-600 mb-3">{message}</p>}
+      <button onClick={handleSave} disabled={saving} className="bg-brand-blue-strong text-white px-8 py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">{saving ? "Saving..." : "Save Attendance"}</button>
     </div>
   );
 }

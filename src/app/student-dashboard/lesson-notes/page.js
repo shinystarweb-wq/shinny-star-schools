@@ -51,10 +51,9 @@ export default function StudentLessonNotesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {filtered.map((note) => (
             <div key={note.id} className="border border-slate-200 rounded-xl p-4">
-              <p className="text-sm font-semibold text-slate-800">{note.title}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{note.subject} • {note.term}{note.week_number ? " • Week " + note.week_number : ""}</p>
-              {note.teachers?.full_name && <p className="text-xs text-slate-500 mt-1">By {note.teachers.full_name}</p>}
-              {note.content && <p className="text-xs text-slate-600 mt-2 line-clamp-3">{note.content}</p>}
+              <p className="text-sm font-semibold text-slate-800">{note.topic || note.title}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{note.subject}{note.week_number ? " • Week " + note.week_number : ""}</p>
+              {note.content && <p className="text-xs text-slate-600 mt-2 whitespace-pre-wrap">{note.content}</p>}
               {note.file_url && (
                 <a href={note.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-blue-strong font-medium mt-2 inline-flex items-center gap-1 hover:underline">📎 {note.file_name || "View attached file"}</a>
               )}

@@ -335,7 +335,7 @@ export default function TeacherProfile() {
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-white/20 border border-white/40 flex items-center justify-center mb-2 text-lg">🏫</div>
                 )}
-                <p className="font-bold tracking-wide text-sm leading-tight">{schoolSettings?.school_name || "SHINNY STAR SCHOOLS"}</p>
+                <p className="font-bold tracking-wide text-sm leading-tight">{schoolSettings?.school_name || "SHINY STAR SCHOOLS"}</p>
                 <p className="text-[10px] text-white/70 mt-1 uppercase tracking-wider">Staff ID Card</p>
               </div>
               <img src={qrUrl} alt="QR Code" className="w-24 h-24 rounded-lg bg-white p-1.5 relative z-10" />

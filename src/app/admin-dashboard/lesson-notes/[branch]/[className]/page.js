@@ -95,6 +95,7 @@ export default function ClassLessonNotesPage() {
                       <button onClick={() => handleDelete(note.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
                     </div>
                     {note.teachers?.full_name && <p className="text-xs text-slate-500 mt-1">By {note.teachers.full_name}</p>}
+                    {note.objectives && <p className="text-xs text-slate-600 mt-2"><span className="font-medium text-slate-700">Objectives:</span> {note.objectives}</p>}
                     {note.content && <p className="text-xs text-slate-600 mt-2 line-clamp-3">{note.content}</p>}
                     {note.file_url && (
                       <a href={note.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-blue-strong font-medium mt-2 inline-flex items-center gap-1 hover:underline">📎 {note.file_name || "View attached file"}</a>

@@ -106,6 +106,7 @@ export default function TeacherLessonNotesPage() {
                       </div>
                       <span className={"text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ml-2 " + (note.status === "published" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500")}>{note.status === "published" ? "Published" : "Draft"}</span>
                     </div>
+                    {note.objectives && <p className="text-xs text-slate-600 mt-2"><span className="font-medium text-slate-700">Objectives:</span> {note.objectives}</p>}
                     {note.content && <p className="text-xs text-slate-600 mt-2 line-clamp-3">{note.content}</p>}
                     {note.file_url && (
                       <a href={note.file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-blue-strong font-medium mt-2 inline-flex items-center gap-1 hover:underline">📎 {note.file_name || "View attached file"}</a>
@@ -123,8 +124,12 @@ export default function TeacherLessonNotesPage() {
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex gap-2">
                             <button onClick={() => togglePublish(note, "admin")} className="text-xs border border-slate-300 px-2.5 py-1 rounded-lg hover:bg-slate-50 font-medium">Push to Admin</button>
-                            <button onClick={() => togglePublish(note, "admin_and_students")} className="text-xs border border-slate-300 px-2.5 py-1 rounded-lg hover:bg-slate-50 font-medium">Push to Admin & Students</button>
-                            <button onClick={() => togglePublish(note, "students")} className="text-xs border border-slate-300 px-2.5 py-1 rounded-lg hover:bg-slate-50 font-medium">Push to Students</button>
+                            {teacher.branch !== "School" && (
+                              <>
+                                <button onClick={() => togglePublish(note, "admin_and_students")} className="text-xs border border-slate-300 px-2.5 py-1 rounded-lg hover:bg-slate-50 font-medium">Push to Admin & Students</button>
+                                <button onClick={() => togglePublish(note, "students")} className="text-xs border border-slate-300 px-2.5 py-1 rounded-lg hover:bg-slate-50 font-medium">Push to Students</button>
+                              </>
+                            )}
                           </div>
                           <button onClick={() => handleDelete(note.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
                         </div>
@@ -143,7 +148,7 @@ export default function TeacherLessonNotesPage() {
 
 function AddNoteForm({ teacher, subjects, classOptions, onAdded }) {
   const fileInputRef = useRef(null);
-  const [form, setForm] = useState({ class: "", subject: "", title: "", content: "", term: "1st Term", week_number: "" });
+  const [form, setForm] = useState({ class: "", subject: "", title: "", objectives: "", topic: "", content: "", term: "1st Term", week_number: "" });
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -190,7 +195,8 @@ function AddNoteForm({ teacher, subjects, classOptions, onAdded }) {
     }
 
     const { error: insertError } = await supabase.from("lesson_notes").insert([{
-      branch: teacher.branch, class: form.class, subject: form.subject, title: form.title, content: form.content,
+      branch: teacher.branch, class: form.class, subject: form.subject, title: form.title,
+      objectives: form.objectives, topic: form.topic || form.title, content: form.content,
       term: form.term, week_number: form.week_number ? parseInt(form.week_number) : null,
       session: SESSION, file_url, file_name, teacher_id: teacher.id, status: "draft", location: teacher.location,
     }]);
@@ -233,6 +239,18 @@ function AddNoteForm({ teacher, subjects, classOptions, onAdded }) {
           <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
           <input type="text" value={form.title} onChange={(e) => update("title", e.target.value)} placeholder="e.g. Introduction to Fractions" className={inputClass} />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Topic</label>
+          <input type="text" value={form.topic} onChange={(e) => update("topic", e.target.value)} placeholder="e.g. Fractions" className={inputClass} />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Objectives (for Admin)</label>
+        <textarea value={form.objectives} onChange={(e) => update("objectives", e.target.value)} rows={2} placeholder="e.g. Students will be able to identify and simplify fractions." className={inputClass}></textarea>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Week Number (optional)</label>
           <input type="number" min="1" value={form.week_number} onChange={(e) => update("week_number", e.target.value)} className={inputClass} />
