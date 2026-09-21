@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import * as faceapi from "face-api.js";
@@ -137,7 +136,6 @@ export default function TeacherProfile() {
     if (!error) router.push("/admin-dashboard/teachers/" + teacher.branch.toLowerCase());
   }
 
-  async function resetPin() {
   async function resetPin() {
     if (!confirm("Generate a new PIN for this teacher? The old PIN will stop working for login and attendance.")) return;
     setResettingPin(true);

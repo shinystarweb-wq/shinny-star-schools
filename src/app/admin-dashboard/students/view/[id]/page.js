@@ -90,10 +90,9 @@ export default function StudentProfile() {
   }
 
   async function resetPin() {
-  async function resetPin() {
     if (!confirm("Generate a new PIN for this student? The old PIN will stop working for login and attendance.")) return;
     setResettingPin(true);
-const newPinValue = Math.floor(100000 + Math.random() * 900000).toString();
+    const newPinValue = Math.floor(100000 + Math.random() * 900000).toString();
     const { error } = await supabase.from("students").update({ pin: newPinValue }).eq("id", id);
     setResettingPin(false);
     if (!error) {
