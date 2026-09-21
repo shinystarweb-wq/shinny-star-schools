@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -28,6 +29,7 @@ function Field({ label, children }) {
 export default function TeacherProfile() {
   const [schoolSettings, setSchoolSettings] = useState(null);
   const { id } = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const newPin = searchParams.get("newpin");
 
@@ -121,6 +123,21 @@ export default function TeacherProfile() {
     }
   }
 
+  async function archiveToggle() {
+    const newStatus = teacher.status === "archived" ? "active" : "archived";
+    if (!confirm(newStatus === "archived" ? "Archive this teacher? They'll be hidden from active lists but can be restored anytime." : "Restore this teacher to active status?")) return;
+    const { error } = await supabase.from("teachers").update({ status: newStatus }).eq("id", id);
+    if (!error) setTeacher((prev) => ({ ...prev, status: newStatus }));
+  }
+
+  async function deleteTeacher() {
+    if (!confirm("Permanently delete this teacher and all their records? This cannot be undone.")) return;
+    if (!confirm("Are you absolutely sure?")) return;
+    const { error } = await supabase.from("teachers").delete().eq("id", id);
+    if (!error) router.push("/admin-dashboard/teachers/" + teacher.branch.toLowerCase());
+  }
+
+  async function resetPin() {
   async function resetPin() {
     if (!confirm("Generate a new PIN for this teacher? The old PIN will stop working for login and attendance.")) return;
     setResettingPin(true);
@@ -220,9 +237,14 @@ export default function TeacherProfile() {
             <p className="text-sm text-slate-500">{teacher.subject || "No subject set"} • {teacher.branch}{teacher.staff_id ? " • " + teacher.staff_id : ""}</p>
           </div>
         </div>
-        <span className={"text-xs font-semibold px-3 py-1.5 rounded-full " + (teacher.verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}>
-          {teacher.verified ? "✓ Verified" : "⚠ Not Verified"}
-        </span>
+        <div className="flex items-center gap-2">
+          {teacher.status === "archived" && <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-600">Archived</span>}
+          <span className={"text-xs font-semibold px-3 py-1.5 rounded-full " + (teacher.verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}>
+            {teacher.verified ? "✓ Verified" : "⚠ Not Verified"}
+          </span>
+          <button onClick={archiveToggle} className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-300 hover:bg-slate-50">{teacher.status === "archived" ? "Restore" : "Archive"}</button>
+          <button onClick={deleteTeacher} className="text-xs font-medium px-3 py-1.5 rounded-full border border-red-300 text-red-600 hover:bg-red-50">Delete</button>
+        </div>
       </div>
 
       {newPin && (

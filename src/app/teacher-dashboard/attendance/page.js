@@ -439,7 +439,7 @@ function MarkTab({ branch }) {
 
   async function loadModels() {
     if (modelsLoaded) return;
-    await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+    await faceapi.nets.ssdMobilenetv1.loadFromUri("/models");
     await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
     await faceapi.nets.faceRecognitionNet.loadFromUri("/models");
     setModelsLoaded(true);
@@ -470,7 +470,9 @@ function MarkTab({ branch }) {
     setScanning(true);
     setFaceReady(false);
     await loadModels();
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
     streamRef.current = stream;
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
@@ -478,19 +480,50 @@ function MarkTab({ branch }) {
     }
 
     const enrolled = allStudents.filter((s) => s.face_descriptor);
+    let pendingMatch = null;
+    let pendingCount = 0;
 
     loopRef.current = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState !== 4 || enrolled.length === 0) return;
-      const detection = await faceapi.detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-      if (!detection) return;
+      const detection = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 }))
+        .withFaceLandmarks()
+        .withFaceDescriptor();
 
-      let bestMatch = null, bestDistance = 999;
-      enrolled.forEach((s) => {
-        const distance = faceapi.euclideanDistance(detection.descriptor, s.face_descriptor);
-        if (distance < bestDistance) { bestDistance = distance; bestMatch = s; }
-      });
-      if (bestMatch && bestDistance < 0.55) markPresent(bestMatch);
-    }, 800);
+      if (!detection) {
+        pendingMatch = null;
+        pendingCount = 0;
+        return;
+      }
+
+      const distances = enrolled.map((s) => ({
+        student: s,
+        distance: faceapi.euclideanDistance(detection.descriptor, s.face_descriptor),
+      })).sort((a, b) => a.distance - b.distance);
+
+      const best = distances[0];
+      const secondBest = distances[1];
+
+      const isConfident = best && best.distance < 0.42 && (!secondBest || secondBest.distance - best.distance > 0.08);
+
+      if (isConfident) {
+        if (pendingMatch === best.student.id) {
+          pendingCount++;
+        } else {
+          pendingMatch = best.student.id;
+          pendingCount = 1;
+        }
+
+        if (pendingCount >= 3) {
+          markPresent(best.student);
+          pendingMatch = null;
+          pendingCount = 0;
+        }
+      } else {
+        pendingMatch = null;
+        pendingCount = 0;
+      }
+    }, 700);
   }
 
   async function startQrScan() {

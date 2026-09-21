@@ -30,6 +30,7 @@ export default function AdminLayout({ children }) {
       links: [
         { href: "/admin-dashboard/students", label: "Students" },
         { href: "/admin-dashboard/teachers", label: "Teachers" },
+        { href: "/admin-dashboard/staff", label: "Non-Teaching Staff" },
       ],
     },
     {

@@ -75,6 +75,21 @@ export default function StudentProfile() {
     }
   }
 
+  async function archiveToggle() {
+    const newStatus = student.status === "archived" ? "active" : "archived";
+    if (!confirm(newStatus === "archived" ? "Archive this student? They'll be hidden from active lists but can be restored anytime." : "Restore this student to active status?")) return;
+    const { error } = await supabase.from("students").update({ status: newStatus }).eq("id", id);
+    if (!error) setStudent((prev) => ({ ...prev, status: newStatus }));
+  }
+
+  async function deleteStudent() {
+    if (!confirm("Permanently delete this student and all their records? This cannot be undone. Consider Archive instead if they might return.")) return;
+    if (!confirm("Are you absolutely sure? This will delete their attendance, results, and all history permanently.")) return;
+    const { error } = await supabase.from("students").delete().eq("id", id);
+    if (!error) router.push("/admin-dashboard/students/" + student.branch.toLowerCase());
+  }
+
+  async function resetPin() {
   async function resetPin() {
     if (!confirm("Generate a new PIN for this student? The old PIN will stop working for login and attendance.")) return;
     setResettingPin(true);
@@ -174,9 +189,14 @@ const newPinValue = Math.floor(100000 + Math.random() * 900000).toString();
             <p className="text-sm text-slate-500">{student.class} • {student.branch}{student.reg_number ? " • " + student.reg_number : ""}</p>
           </div>
         </div>
-        <span className={"text-xs font-semibold px-3 py-1.5 rounded-full " + (student.verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}>
-          {student.verified ? "✓ Verified" : "⚠ Not Verified"}
-        </span>
+        <div className="flex items-center gap-2">
+          {student.status === "archived" && <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-600">Archived</span>}
+          <span className={"text-xs font-semibold px-3 py-1.5 rounded-full " + (student.verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700")}>
+            {student.verified ? "✓ Verified" : "⚠ Not Verified"}
+          </span>
+          <button onClick={archiveToggle} className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-300 hover:bg-slate-50">{student.status === "archived" ? "Restore" : "Archive"}</button>
+          <button onClick={deleteStudent} className="text-xs font-medium px-3 py-1.5 rounded-full border border-red-300 text-red-600 hover:bg-red-50">Delete</button>
+        </div>
       </div>
 
       {newPin && (
