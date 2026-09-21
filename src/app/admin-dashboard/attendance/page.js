@@ -366,6 +366,8 @@ function MarkTab({ who }) {
   const [markedList, setMarkedList] = useState([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [faceReady, setFaceReady] = useState(false);
+  const [faceMatched, setFaceMatched] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState("user");
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -383,7 +385,7 @@ function MarkTab({ who }) {
       setLoadingPeople(true);
       const stored = sessionStorage.getItem("shinnystar_user");
       const location = stored ? JSON.parse(stored).location : null;
-      const select = who === "students" ? "id, full_name, photo_url, class, branch, face_descriptor, guardian_email" : "id, full_name, photo_url, branch, face_descriptor";
+      const select = who === "students" ? "id, full_name, photo_url, class, branch, face_descriptor, guardian_email, pin" : "id, full_name, photo_url, branch, face_descriptor, pin";
       const { data } = await supabase.from(table).select(select).eq("location", location);
       setAllPeople(data || []);
       setLoadingPeople(false);
@@ -429,13 +431,14 @@ function MarkTab({ who }) {
     }
   }
 
-  async function startFaceScan() {
+  async function startFaceScan(facing) {
     setScanMessage("");
     setScanning(true);
     setFaceReady(false);
+    setFaceMatched(false);
     await loadModels();
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: facing || cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
     });
     streamRef.current = stream;
     if (videoRef.current) {
@@ -443,7 +446,7 @@ function MarkTab({ who }) {
       videoRef.current.onloadedmetadata = () => setFaceReady(true);
     }
 
-    const enrolled = allStudents.filter((s) => s.face_descriptor);
+    const enrolled = allPeople.filter((p) => p.face_descriptor);
     let pendingMatch = null;
     let pendingCount = 0;
 
@@ -457,43 +460,52 @@ function MarkTab({ who }) {
       if (!detection) {
         pendingMatch = null;
         pendingCount = 0;
+        setFaceMatched(false);
         return;
       }
 
-      const distances = enrolled.map((s) => ({
-        student: s,
-        distance: faceapi.euclideanDistance(detection.descriptor, s.face_descriptor),
+      const distances = enrolled.map((p) => ({
+        person: p,
+        distance: faceapi.euclideanDistance(detection.descriptor, p.face_descriptor),
       })).sort((a, b) => a.distance - b.distance);
 
       const best = distances[0];
       const secondBest = distances[1];
-
       const isConfident = best && best.distance < 0.42 && (!secondBest || secondBest.distance - best.distance > 0.08);
 
       if (isConfident) {
-        if (pendingMatch === best.student.id) {
+        setFaceMatched(true);
+        if (pendingMatch === best.person.id) {
           pendingCount++;
         } else {
-          pendingMatch = best.student.id;
+          pendingMatch = best.person.id;
           pendingCount = 1;
         }
 
         if (pendingCount >= 3) {
-          markPresent(best.student);
+          markPresent(best.person);
           pendingMatch = null;
           pendingCount = 0;
         }
       } else {
+        setFaceMatched(false);
         pendingMatch = null;
         pendingCount = 0;
       }
     }, 700);
   }
 
-  async function startQrScan() {
+  async function switchCamera() {
+    const newFacing = cameraFacing === "user" ? "environment" : "user";
+    setCameraFacing(newFacing);
+    stopScan();
+    startScan(method, newFacing);
+  }
+
+  async function startQrScan(facing) {
     setScanMessage("");
     setScanning(true);
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing || cameraFacing } });
     streamRef.current = stream;
     if (videoRef.current) videoRef.current.srcObject = stream;
 
@@ -529,6 +541,7 @@ function MarkTab({ who }) {
     }
     setScanning(false);
     setFaceReady(false);
+    setFaceMatched(false);
   }
 
   function switchMethod(m) {
@@ -537,9 +550,10 @@ function MarkTab({ who }) {
     setScanMessage("");
   }
 
-  function startScan() {
-    if (method === "face") startFaceScan();
-    if (method === "qr") startQrScan();
+  function startScan(m, facing) {
+    const activeMethod = m || method;
+    if (activeMethod === "face") startFaceScan(facing);
+    if (activeMethod === "qr") startQrScan(facing);
   }
 
   const enrolledCount = allPeople.filter((p) => p.face_descriptor).length;
@@ -548,7 +562,7 @@ function MarkTab({ who }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2">
-        <div className="flex gap-2 mb-5 bg-slate-100 p-1.5 rounded-xl w-fit">
+        <div className="flex gap-2 mb-5 bg-slate-100 p-1.5 rounded-xl w-fit flex-wrap">
           <button onClick={() => switchMethod("face")} className={"flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-all " + (method === "face" ? "bg-white text-brand-blue-strong shadow-sm" : "text-slate-500 hover:text-slate-700")}>
             <span>📷</span> Face Scan
           </button>
@@ -563,27 +577,26 @@ function MarkTab({ who }) {
         <div className="border border-slate-200 rounded-2xl p-6 bg-white">
           {method === "face" && (
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="font-semibold text-slate-800">Face Recognition</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">{loadingPeople ? "Loading..." : enrolledCount + " " + who + " enrolled for face scan"}</p>
-                </div>
-              </div>
+              <p className="text-xs text-slate-500 mb-4">{loadingPeople ? "Loading..." : enrolledCount + " " + who + " enrolled for face scan"}</p>
 
               {!scanning ? (
                 <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
                   <div className="w-16 h-16 rounded-full bg-brand-blue flex items-center justify-center text-3xl mb-4">📷</div>
                   <p className="text-sm text-slate-500 mb-4">Ready to scan {personLabel} faces</p>
-                  <button onClick={startScan} className="bg-brand-blue-strong text-white px-6 py-2.5 rounded-lg font-medium hover:opacity-90 shadow-sm">Start Face Scan</button>
+                  <button onClick={() => startScan("face")} className="bg-brand-blue-strong text-white px-6 py-2.5 rounded-lg font-medium hover:opacity-90 shadow-sm">Start Face Scan</button>
                 </div>
               ) : (
-                <div>
-                  <div className={"relative rounded-2xl overflow-hidden bg-slate-900 aspect-video mb-4 border-4 transition-colors " + (faceReady ? "border-brand-blue-strong" : "border-transparent")}>
-                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover"></video>
+                <div className="flex flex-col items-center">
+                  <div className={"relative w-72 h-72 rounded-full overflow-hidden bg-slate-900 mb-4 border-8 transition-colors " + (faceMatched ? "border-green-500" : faceReady ? "border-brand-blue-strong" : "border-transparent")}>
+                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" style={{ transform: cameraFacing === "user" ? "scaleX(-1)" : "none" }}></video>
                     {!faceReady && <p className="absolute inset-0 flex items-center justify-center text-white text-sm bg-slate-900/50">Starting camera...</p>}
-                    {faceReady && <div className="absolute top-3 left-3 bg-green-500 text-white text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> Scanning</div>}
+                    {faceMatched && <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">✓ Face Matched</div>}
                   </div>
-                  <button onClick={stopScan} className="border border-slate-300 px-6 py-2.5 rounded-lg font-medium hover:bg-slate-50">Stop Scanning</button>
+                  <p className={"text-sm font-medium mb-4 " + (faceMatched ? "text-green-600" : "text-slate-500")}>{faceMatched ? "Marking attendance..." : "Position your face in the circle"}</p>
+                  <div className="flex gap-3">
+                    <button onClick={switchCamera} className="border border-slate-300 px-5 py-2.5 rounded-lg font-medium hover:bg-slate-50 flex items-center gap-2">🔄 Switch Camera</button>
+                    <button onClick={stopScan} className="border border-slate-300 px-5 py-2.5 rounded-lg font-medium hover:bg-slate-50">Stop</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -600,7 +613,7 @@ function MarkTab({ who }) {
                 <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
                   <div className="w-16 h-16 rounded-full bg-brand-blue flex items-center justify-center text-3xl mb-4">▦</div>
                   <p className="text-sm text-slate-500 mb-4">Ready to scan ID cards</p>
-                  <button onClick={startScan} className="bg-brand-blue-strong text-white px-6 py-2.5 rounded-lg font-medium hover:opacity-90 shadow-sm">Start QR Scan</button>
+                  <button onClick={() => startScan("qr")} className="bg-brand-blue-strong text-white px-6 py-2.5 rounded-lg font-medium hover:opacity-90 shadow-sm">Start QR Scan</button>
                 </div>
               ) : (
                 <div>
@@ -609,18 +622,17 @@ function MarkTab({ who }) {
                     <div className="absolute top-3 left-3 bg-green-500 text-white text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> Scanning</div>
                   </div>
                   <canvas ref={canvasRef} className="hidden"></canvas>
-                  <button onClick={stopScan} className="border border-slate-300 px-6 py-2.5 rounded-lg font-medium hover:bg-slate-50">Stop Scanning</button>
+                  <div className="flex gap-3">
+                    <button onClick={switchCamera} className="border border-slate-300 px-5 py-2.5 rounded-lg font-medium hover:bg-slate-50 flex items-center gap-2">🔄 Switch Camera</button>
+                    <button onClick={stopScan} className="border border-slate-300 px-5 py-2.5 rounded-lg font-medium hover:bg-slate-50">Stop Scanning</button>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
           {method === "pin" && (
-            <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-              <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center text-3xl mb-4">🔢</div>
-              <p className="text-sm font-medium text-slate-700 mb-1">PIN Attendance</p>
-              <p className="text-xs text-slate-500 text-center max-w-xs">Coming soon — every {personLabel} already has a PIN, this screen just needs a number pad wired up next.</p>
-            </div>
+            <PinMarkPanel people={allPeople} personLabel={personLabel} onMarked={markPresent} />
           )}
 
           {scanMessage && (
@@ -656,6 +668,69 @@ function MarkTab({ who }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PinMarkPanel({ people, personLabel, onMarked }) {
+  const [pin, setPin] = useState("");
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+
+  function pressDigit(d) {
+    if (pin.length >= 6) return;
+    setPin((prev) => prev + d);
+    setError("");
+  }
+
+  function backspace() {
+    setPin((prev) => prev.slice(0, -1));
+  }
+
+  function clearPin() {
+    setPin("");
+    setError("");
+    setStatus("");
+  }
+
+  function submit() {
+    setError("");
+    const match = people.find((p) => p.pin === pin);
+    if (!match) {
+      setError("No " + personLabel + " found with that PIN.");
+      setPin("");
+      return;
+    }
+    onMarked(match);
+    setStatus(match.full_name + " marked present.");
+    setPin("");
+    setTimeout(() => setStatus(""), 3000);
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <p className="text-sm text-slate-600 mb-4">Enter your {personLabel} PIN to check in</p>
+      <div className="flex gap-2 mb-6">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className={"w-10 h-12 rounded-lg border-2 flex items-center justify-center text-lg font-bold " + (pin.length > i ? "border-brand-blue-strong bg-brand-blue" : "border-slate-200")}>
+            {pin.length > i ? "•" : ""}
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+      {status && <p className="text-sm text-green-600 mb-3">✓ {status}</p>}
+
+      <div className="grid grid-cols-3 gap-3 max-w-xs w-full">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+          <button key={n} onClick={() => pressDigit(String(n))} className="bg-slate-100 hover:bg-slate-200 rounded-xl py-4 text-lg font-semibold text-slate-800 transition">{n}</button>
+        ))}
+        <button onClick={clearPin} className="bg-slate-100 hover:bg-slate-200 rounded-xl py-4 text-sm font-semibold text-slate-500 transition">Clear</button>
+        <button onClick={() => pressDigit("0")} className="bg-slate-100 hover:bg-slate-200 rounded-xl py-4 text-lg font-semibold text-slate-800 transition">0</button>
+        <button onClick={backspace} className="bg-slate-100 hover:bg-slate-200 rounded-xl py-4 text-sm font-semibold text-slate-500 transition">⌫</button>
+      </div>
+
+      <button onClick={submit} disabled={pin.length < 4} className="mt-6 bg-brand-blue-strong text-white px-10 py-3 rounded-lg font-medium hover:opacity-90 disabled:opacity-50">Check In</button>
     </div>
   );
 }

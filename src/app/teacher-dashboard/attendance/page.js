@@ -429,8 +429,7 @@ function MarkTab({ branch }) {
 
   useEffect(() => {
     async function loadAll() {
-      const { data } = await supabase.from("students").select("id, full_name, photo_url, class, branch, face_descriptor, guardian_email").eq("branch", branch);
-      setAllStudents(data || []);
+      const { data } = await supabase.from("students").select("id, full_name, photo_url, class, branch, face_descriptor, guardian_email, pin").eq("branch", branch);
       setLoadingStudents(false);
     }
     loadAll();
