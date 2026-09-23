@@ -368,6 +368,7 @@ function MarkTab({ who }) {
   const [faceReady, setFaceReady] = useState(false);
   const [faceMatched, setFaceMatched] = useState(false);
   const [cameraFacing, setCameraFacing] = useState("user");
+  const [cutoffTime, setCutoffTime] = useState(null);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -388,6 +389,10 @@ function MarkTab({ who }) {
       const select = who === "students" ? "id, full_name, photo_url, class, branch, face_descriptor, guardian_email, pin" : "id, full_name, photo_url, branch, face_descriptor, pin";
       const { data } = await supabase.from(table).select(select).eq("location", location);
       setAllPeople(data || []);
+
+      const { data: settingsData } = await supabase.from("school_settings").select("late_cutoff_time").eq("location", location).single();
+      setCutoffTime(settingsData?.late_cutoff_time || "08:00");
+
       setLoadingPeople(false);
     }
     loadAll();
@@ -398,7 +403,7 @@ function MarkTab({ who }) {
 
   async function loadModels() {
     if (modelsLoaded) return;
-    await faceapi.nets.ssdMobilenetv1.loadFromUri("/models");
+    await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
     await faceapi.nets.faceLandmark68Net.loadFromUri("/models");
     await faceapi.nets.faceRecognitionNet.loadFromUri("/models");
     setModelsLoaded(true);
@@ -409,11 +414,12 @@ function MarkTab({ who }) {
     lastMarkedRef.current[person.id] = true;
 
     const today = todayStr();
-    const row = { [idField]: person.id, attendance_date: today, status: "present" };
+    const status = getStatusForNow();
+    const row = { [idField]: person.id, attendance_date: today, status };
     await supabase.from(attTable).upsert([row], { onConflict: idField + ",attendance_date" });
 
-    setMarkedList((prev) => [{ ...person, time: new Date().toLocaleTimeString() }, ...prev]);
-    setScanMessage(person.full_name + " marked present.");
+    setMarkedList((prev) => [{ ...person, time: new Date().toLocaleTimeString(), status }, ...prev]);
+    setScanMessage(person.full_name + " marked " + status + ".");
     setTimeout(() => setScanMessage(""), 3000);
 
     if (who === "students" && person.guardian_email) {
@@ -423,12 +429,21 @@ function MarkTab({ who }) {
         body: JSON.stringify({
           guardianEmail: person.guardian_email,
           studentName: person.full_name,
-          status: "present",
+          status,
           date: today,
           className: person.class,
         }),
       }).catch(() => {});
     }
+  }
+
+  function getStatusForNow() {
+    if (!cutoffTime) return "present";
+    const now = new Date();
+    const [h, m] = cutoffTime.split(":").map(Number);
+    const cutoff = new Date();
+    cutoff.setHours(h, m, 0, 0);
+    return now > cutoff ? "late" : "present";
   }
 
   async function startFaceScan(facing) {
@@ -438,7 +453,7 @@ function MarkTab({ who }) {
     setFaceMatched(false);
     await loadModels();
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facing || cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: facing || cameraFacing, width: { ideal: 960 }, height: { ideal: 960 } },
     });
     streamRef.current = stream;
     if (videoRef.current) {
@@ -449,11 +464,15 @@ function MarkTab({ who }) {
     const enrolled = allPeople.filter((p) => p.face_descriptor);
     let pendingMatch = null;
     let pendingCount = 0;
+    let busy = false;
+    const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
 
     loopRef.current = setInterval(async () => {
-      if (!videoRef.current || videoRef.current.readyState !== 4 || enrolled.length === 0) return;
+      if (busy || !videoRef.current || videoRef.current.readyState !== 4 || enrolled.length === 0) return;
+      busy = true;
+
       const detection = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 }))
+        .detectSingleFace(videoRef.current, detectorOptions)
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -461,6 +480,7 @@ function MarkTab({ who }) {
         pendingMatch = null;
         pendingCount = 0;
         setFaceMatched(false);
+        busy = false;
         return;
       }
 
@@ -471,7 +491,7 @@ function MarkTab({ who }) {
 
       const best = distances[0];
       const secondBest = distances[1];
-      const isConfident = best && best.distance < 0.42 && (!secondBest || secondBest.distance - best.distance > 0.08);
+      const isConfident = best && best.distance < 0.45 && (!secondBest || secondBest.distance - best.distance > 0.06);
 
       if (isConfident) {
         setFaceMatched(true);
@@ -482,7 +502,7 @@ function MarkTab({ who }) {
           pendingCount = 1;
         }
 
-        if (pendingCount >= 3) {
+        if (pendingCount >= 2) {
           markPresent(best.person);
           pendingMatch = null;
           pendingCount = 0;
@@ -492,7 +512,8 @@ function MarkTab({ who }) {
         pendingMatch = null;
         pendingCount = 0;
       }
-    }, 700);
+      busy = false;
+    }, 250);
   }
 
   async function switchCamera() {
@@ -662,7 +683,7 @@ function MarkTab({ who }) {
                   <p className="text-sm font-medium text-slate-800 truncate">{p.full_name}</p>
                   <p className="text-[10px] text-slate-500">{who === "students" ? p.class + " • " : ""}{p.time}</p>
                 </div>
-                <span className="text-green-600 text-sm">✓</span>
+                <span className={"text-xs font-semibold px-2 py-0.5 rounded-full " + (p.status === "late" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700")}>{p.status === "late" ? "Late" : "✓"}</span>
               </div>
             ))}
           </div>

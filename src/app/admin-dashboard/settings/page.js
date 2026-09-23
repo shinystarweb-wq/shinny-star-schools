@@ -75,7 +75,8 @@ export default function SettingsPage() {
     const { error } = await supabase.from("school_settings").update({
       school_name: settings.school_name, logo_url, address: settings.address, phone: settings.phone,
       email: settings.email, website: settings.website, current_term: settings.current_term,
-      current_session: settings.current_session, updated_at: new Date().toISOString(),
+      current_session: settings.current_session, late_cutoff_time: settings.late_cutoff_time,
+      updated_at: new Date().toISOString(),
     }).eq("location", location);
 
     setSaving(false);
@@ -149,6 +150,13 @@ export default function SettingsPage() {
               <input type="text" value={settings.current_session || ""} onChange={(e) => update("current_session", e.target.value)} placeholder="e.g. 2025/2026" className={inputClass} />
             </Field>
           </div>
+        </div>
+
+        <div className="border border-slate-200 rounded-2xl p-6">
+          <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-4">Attendance</h2>
+          <Field label="Late Cutoff Time" hint="Anyone marked present via face, QR, or PIN scan before this time is Present. After this time, they're automatically marked Late instead.">
+            <input type="time" value={settings.late_cutoff_time || "08:00"} onChange={(e) => update("late_cutoff_time", e.target.value)} className={inputClass + " max-w-xs"} />
+          </Field>
         </div>
 
         {message && <p className={"text-sm " + (message.includes("failed") || message.includes("Could not") ? "text-red-600" : "text-green-700")}>{message}</p>}

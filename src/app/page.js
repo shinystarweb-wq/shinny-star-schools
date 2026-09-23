@@ -19,7 +19,7 @@ export default function Home() {
         <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-brand-blue-strong/10"></div>
         <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-brand-blue-strong/10"></div>
         <div className="relative max-w-6xl mx-auto px-6 py-24 text-center">
-          <span className="inline-block bg-white text-brand-blue-strong text-xs font-semibold px-4 py-1.5 rounded-full mb-6 shadow-sm">Now Enrolling — 2025/2026 Session</span>
+          <span className="inline-block bg-white text-brand-blue-strong text-xs font-semibold px-4 py-1.5 rounded-full mb-6 shadow-sm">Now Enrolling — 2026/2027 Session</span>
           <h2 className="text-4xl md:text-6xl font-bold text-slate-800 mb-5 leading-tight">
             Welcome to <br className="hidden md:block" />Shiny Star Schools
           </h2>
@@ -36,9 +36,10 @@ export default function Home() {
       <section id="about" className="max-w-6xl mx-auto px-6 py-20 text-center">
         <p className="text-sm font-semibold text-brand-blue-strong uppercase tracking-wide mb-3">About Us</p>
         <h3 className="text-3xl font-bold text-slate-800 mb-4">Educating with excellence, powered by technology</h3>
-        <p className="text-slate-600 max-w-2xl mx-auto">
+        <p className="text-slate-600 max-w-2xl mx-auto mb-4">
           Shiny Star Schools brings together School, College, and Tutorial sections under one digital roof — giving admins, teachers, students, and parents real-time access to everything that matters, from attendance to results.
         </p>
+        <p className="text-sm text-slate-500">📍 4, Abiola Sarumi Street, Shomolu, Lagos</p>
       </section>
 
       <section id="modules" className="bg-brand-blue/40 py-20">
@@ -91,6 +92,7 @@ export default function Home() {
       <footer id="contact" className="bg-brand-blue-strong text-white">
         <div className="max-w-6xl mx-auto px-6 py-10 text-center text-sm">
           <p className="font-semibold mb-1">SHINY STAR SCHOOLS</p>
+          <p className="text-white/80 mb-1">4, Abiola Sarumi Street, Shomolu, Lagos</p>
           <p className="text-white/70">© 2026 Shiny Star Schools. All rights reserved.</p>
         </div>
       </footer>
