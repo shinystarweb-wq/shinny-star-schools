@@ -15,7 +15,7 @@ export async function POST(request) {
 
   try {
     await resend.emails.send({
-      from: "Shiny Star Schools <onboarding@resend.dev>",
+      from: "Shiny Star Schools <notifications@shinystar.com.ng>",
       to: guardianEmail,
       subject,
       html: `
