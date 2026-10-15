@@ -36,6 +36,10 @@ async function compressImage(file, maxSizeMB) {
   return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
 }
 
+function isImageName(name) {
+  return /\.(png|jpe?g|webp|gif)$/i.test(name || "");
+}
+
 export default function AssignmentDetailPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -88,9 +92,8 @@ export default function AssignmentDetailPage() {
     setNotice("");
 
     const isImage = selected.type.startsWith("image/");
-    const maxAllowed = isImage ? 10 : 10;
 
-    if (selected.size > maxAllowed * 1024 * 1024) {
+    if (selected.size > 10 * 1024 * 1024) {
       setError("File is too large. Max 10MB.");
       return;
     }
@@ -200,7 +203,25 @@ export default function AssignmentDetailPage() {
 
       <div className="border border-slate-200 rounded-2xl p-6 mb-6">
         {assignment.instructions && <p className="text-sm text-slate-600 mb-3">{assignment.instructions}</p>}
-        {assignment.questions && <p className="text-sm text-slate-700 whitespace-pre-wrap border-t border-slate-100 pt-3">{assignment.questions}</p>}
+        {assignment.questions && <p className="text-sm text-slate-700 whitespace-pre-wrap border-t border-slate-100 pt-3 first:border-0 first:pt-0">{assignment.questions}</p>}
+
+        {assignment.file_url && (
+          <div className={assignment.instructions || assignment.questions ? "border-t border-slate-100 pt-4 mt-4" : ""}>
+            <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Assignment File</p>
+            {isImageName(assignment.file_name || assignment.file_url) && (
+              <a href={assignment.file_url} target="_blank" rel="noopener noreferrer">
+                <img src={assignment.file_url} alt="Assignment" className="max-h-96 rounded-lg border border-slate-200 mb-3" />
+              </a>
+            )}
+            <a href={assignment.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-brand-blue-strong font-medium border border-brand-blue-strong/30 bg-brand-blue/40 px-4 py-2.5 rounded-lg hover:bg-brand-blue transition">
+              📎 {assignment.file_name || "Open assignment file"} <span className="text-xs text-slate-500">(open / download)</span>
+            </a>
+          </div>
+        )}
+
+        {!assignment.instructions && !assignment.questions && !assignment.file_url && (
+          <p className="text-sm text-slate-400">No questions have been added to this assignment yet.</p>
+        )}
       </div>
 
       {existingSubmission && (
