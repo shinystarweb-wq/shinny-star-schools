@@ -97,6 +97,9 @@ export default function TeacherAssignmentsPage() {
             <p className="text-xs text-slate-500 mb-3">{selected.subject} {selected.due_date ? "• Due " + selected.due_date : ""}</p>
             {selected.instructions && <p className="text-sm text-slate-600 mb-2">{selected.instructions}</p>}
             {selected.questions && <p className="text-sm text-slate-700 whitespace-pre-wrap border-t border-slate-100 pt-3 mt-3">{selected.questions}</p>}
+            {selected.file_url && (
+              <a href={selected.file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-brand-blue-strong font-medium mt-3 hover:underline">📎 {selected.file_name || "Assignment file"}</a>
+            )}
           </div>
 
           <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">Submissions ({submissions.length})</h2>
