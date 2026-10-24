@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import * as faceapi from "face-api.js";
 import jsQR from "jsqr";
+import { notifyGuardian, notifyMany, summarizeNotifications } from "@/lib/notifyGuardian";
 
 const BRANCHES = [
   { key: "School", icon: "🏫", color: "bg-blue-50 text-blue-700" },
@@ -122,6 +123,7 @@ function RemarkTab({ who }) {
   const [activeClass, setActiveClass] = useState("");
   const [roster, setRoster] = useState([]);
   const [statusMap, setStatusMap] = useState({});
+  const [originalMap, setOriginalMap] = useState({});
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -135,7 +137,7 @@ function RemarkTab({ who }) {
       setView("classes");
       await loadClassCards(b, date);
     } else {
-      await openTeacherRoster(b);
+      await openTeacherRoster(b, date);
     }
   }
 
@@ -169,11 +171,11 @@ function RemarkTab({ who }) {
 
     const stored = sessionStorage.getItem("shinnystar_user");
     const location = stored ? JSON.parse(stored).location : null;
-    const { data: students } = await supabase.from("students").select("id, full_name, photo_url, parent_phone").eq("branch", branch).eq("class", c).eq("location", location).order("full_name");
-    await loadRosterStatus(students || []);
+    const { data: students } = await supabase.from("students").select("id, full_name, photo_url, parent_phone, guardian_email").eq("branch", branch).eq("class", c).eq("location", location).order("full_name");
+    await loadRosterStatus(students || [], date);
   }
 
-  async function openTeacherRoster(b) {
+  async function openTeacherRoster(b, forDate) {
     setView("roster");
     setActiveClass("");
     setLoadingRoster(true);
@@ -182,14 +184,14 @@ function RemarkTab({ who }) {
     const stored = sessionStorage.getItem("shinnystar_user");
     const location = stored ? JSON.parse(stored).location : null;
     const { data: teachers } = await supabase.from("teachers").select("id, full_name, photo_url").eq("branch", b).eq("location", location).order("full_name");
-    await loadRosterStatus(teachers || []);
+    await loadRosterStatus(teachers || [], forDate || date);
   }
 
-  async function loadRosterStatus(people) {
+  async function loadRosterStatus(people, forDate) {
     const ids = people.map((p) => p.id);
     let att = [];
     if (ids.length > 0) {
-      const { data } = await supabase.from(attTable).select(idField + ", status").eq("attendance_date", date).in(idField, ids);
+      const { data } = await supabase.from(attTable).select(idField + ", status").eq("attendance_date", forDate).in(idField, ids);
       att = data || [];
     }
     const initial = {};
@@ -199,6 +201,7 @@ function RemarkTab({ who }) {
     });
     setRoster(people);
     setStatusMap(initial);
+    setOriginalMap(initial);
     setLoadingRoster(false);
   }
 
@@ -214,30 +217,26 @@ function RemarkTab({ who }) {
       attendance_date: date,
       status: statusMap[p.id],
     }));
-    const conflictKey = idField + ",attendance_date";
-    const { error } = await supabase.from(attTable).upsert(rows, { onConflict: conflictKey });
-    setSaving(false);
-    setMessage(error ? "Could not save: " + error.message : "Changes saved.");
+    const { error } = await supabase.from(attTable).upsert(rows, { onConflict: idField + ",attendance_date" });
 
-    if (!error && who === "students") {
-      const absentRows = rows.filter((r) => r.status === "absent");
-      absentRows.forEach((r) => {
-        const student = roster.find((p) => p.id === r.student_id);
-        if (student && student.parent_phone) {
-          fetch("/api/send-attendance-sms", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              phoneNumber: student.parent_phone,
-              studentName: student.full_name,
-              status: "absent",
-              date,
-              className: activeClass,
-            }),
-          }).catch(() => {});
-        }
-      });
+    if (error) {
+      setSaving(false);
+      setMessage("Could not save: " + error.message);
+      return;
     }
+
+    let note = "";
+    if (who === "students") {
+      const changed = roster.filter((p) => (statusMap[p.id] === "present" || statusMap[p.id] === "absent") && statusMap[p.id] !== originalMap[p.id]);
+      if (changed.length > 0) {
+        const results = await notifyMany(changed.map((p) => ({ student: p, status: statusMap[p.id], date, className: activeClass })));
+        note = summarizeNotifications(results);
+      }
+    }
+
+    setOriginalMap({ ...statusMap });
+    setSaving(false);
+    setMessage("Changes saved." + note);
   }
 
   return (
@@ -303,7 +302,7 @@ function RemarkTab({ who }) {
           {who === "teachers" && (
             <div className="flex items-center gap-3 mb-5">
               <label className="text-sm font-medium text-slate-700">Date:</label>
-              <input type="date" value={date} onChange={(e) => { setDate(e.target.value); openTeacherRoster(branch); }} className="border border-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong" />
+              <input type="date" value={date} onChange={(e) => { setDate(e.target.value); openTeacherRoster(branch, e.target.value); }} className="border border-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue-strong" />
             </div>
           )}
           {loadingRoster ? (
@@ -347,8 +346,9 @@ function RemarkTab({ who }) {
                   </tbody>
                 </table>
               </div>
+              {who === "students" && <p className="text-xs text-slate-400 mb-3">Guardians get an SMS when a student is newly marked Present or Absent.</p>}
               {message && <p className="text-sm text-slate-600 mb-3">{message}</p>}
-              <button onClick={handleSave} disabled={saving} className="bg-brand-blue-strong text-white px-8 py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">{saving ? "Saving..." : "Save Changes"}</button>
+              <button onClick={handleSave} disabled={saving} className="bg-brand-blue-strong text-white px-8 py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">{saving ? "Saving & notifying..." : "Save Changes"}</button>
             </>
           )}
         </div>
@@ -368,13 +368,13 @@ function MarkTab({ who }) {
   const [faceReady, setFaceReady] = useState(false);
   const [faceMatched, setFaceMatched] = useState(false);
   const [cameraFacing, setCameraFacing] = useState("user");
-  const [cutoffTime, setCutoffTime] = useState(null);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const loopRef = useRef(null);
   const lastMarkedRef = useRef({});
+  const cutoffRef = useRef("08:00");
 
   const table = who === "students" ? "students" : "teachers";
   const attTable = who === "students" ? "attendance" : "teacher_attendance";
@@ -386,12 +386,14 @@ function MarkTab({ who }) {
       setLoadingPeople(true);
       const stored = sessionStorage.getItem("shinnystar_user");
       const location = stored ? JSON.parse(stored).location : null;
-      const select = who === "students" ? "id, full_name, photo_url, class, branch, face_descriptor, guardian_email, pin" : "id, full_name, photo_url, branch, face_descriptor, pin";
+      const select = who === "students"
+        ? "id, full_name, photo_url, class, branch, face_descriptor, guardian_email, parent_phone, pin"
+        : "id, full_name, photo_url, branch, face_descriptor, pin";
       const { data } = await supabase.from(table).select(select).eq("location", location);
       setAllPeople(data || []);
 
       const { data: settingsData } = await supabase.from("school_settings").select("late_cutoff_time").eq("location", location).single();
-      setCutoffTime(settingsData?.late_cutoff_time || "08:00");
+      cutoffRef.current = settingsData?.late_cutoff_time || "08:00";
 
       setLoadingPeople(false);
     }
@@ -409,41 +411,38 @@ function MarkTab({ who }) {
     setModelsLoaded(true);
   }
 
+  function getStatusForNow() {
+    const [h, m] = String(cutoffRef.current).split(":").map(Number);
+    const cutoff = new Date();
+    cutoff.setHours(h || 0, m || 0, 0, 0);
+    return new Date() > cutoff ? "late" : "present";
+  }
+
   async function markPresent(person) {
     if (lastMarkedRef.current[person.id]) return;
     lastMarkedRef.current[person.id] = true;
 
     const today = todayStr();
+    const { data: existing } = await supabase.from(attTable).select("status").eq(idField, person.id).eq("attendance_date", today).maybeSingle();
+
+    if (existing && (existing.status === "present" || existing.status === "late")) {
+      setScanMessage(person.full_name + " is already marked " + existing.status + " today.");
+      setTimeout(() => setScanMessage(""), 4000);
+      return;
+    }
+
     const status = getStatusForNow();
-    const row = { [idField]: person.id, attendance_date: today, status };
-    await supabase.from(attTable).upsert([row], { onConflict: idField + ",attendance_date" });
+    await supabase.from(attTable).upsert([{ [idField]: person.id, attendance_date: today, status }], { onConflict: idField + ",attendance_date" });
 
     setMarkedList((prev) => [{ ...person, time: new Date().toLocaleTimeString(), status }, ...prev]);
     setScanMessage(person.full_name + " marked " + status + ".");
-    setTimeout(() => setScanMessage(""), 3000);
 
-    if (who === "students" && person.guardian_email) {
-      fetch("/api/send-attendance-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          guardianEmail: person.guardian_email,
-          studentName: person.full_name,
-          status,
-          date: today,
-          className: person.class,
-        }),
-      }).catch(() => {});
+    if (who === "students") {
+      const result = await notifyGuardian({ student: person, status, date: today, className: person.class });
+      const note = summarizeNotifications([result]);
+      setScanMessage(person.full_name + " marked " + status + "." + note);
     }
-  }
-
-  function getStatusForNow() {
-    if (!cutoffTime) return "present";
-    const now = new Date();
-    const [h, m] = cutoffTime.split(":").map(Number);
-    const cutoff = new Date();
-    cutoff.setHours(h, m, 0, 0);
-    return now > cutoff ? "late" : "present";
+    setTimeout(() => setScanMessage(""), 5000);
   }
 
   async function startFaceScan(facing) {
@@ -516,13 +515,6 @@ function MarkTab({ who }) {
     }, 250);
   }
 
-  async function switchCamera() {
-    const newFacing = cameraFacing === "user" ? "environment" : "user";
-    setCameraFacing(newFacing);
-    stopScan();
-    startScan(method, newFacing);
-  }
-
   async function startQrScan(facing) {
     setScanMessage("");
     setScanning(true);
@@ -543,8 +535,7 @@ function MarkTab({ who }) {
       if (code) {
         const match = code.data.match(new RegExp(viewPath + "/view/([a-f0-9-]+)", "i"));
         if (match) {
-          const personId = match[1];
-          const person = allPeople.find((p) => p.id === personId);
+          const person = allPeople.find((p) => p.id === match[1]);
           if (person) markPresent(person);
         }
       }
@@ -565,16 +556,23 @@ function MarkTab({ who }) {
     setFaceMatched(false);
   }
 
-  function switchMethod(m) {
-    stopScan();
-    setMethod(m);
-    setScanMessage("");
-  }
-
   function startScan(m, facing) {
     const activeMethod = m || method;
     if (activeMethod === "face") startFaceScan(facing);
     if (activeMethod === "qr") startQrScan(facing);
+  }
+
+  function switchCamera() {
+    const newFacing = cameraFacing === "user" ? "environment" : "user";
+    setCameraFacing(newFacing);
+    stopScan();
+    startScan(method, newFacing);
+  }
+
+  function switchMethod(m) {
+    stopScan();
+    setMethod(m);
+    setScanMessage("");
   }
 
   const enrolledCount = allPeople.filter((p) => p.face_descriptor).length;
@@ -723,7 +721,7 @@ function PinMarkPanel({ people, personLabel, onMarked }) {
       return;
     }
     onMarked(match);
-    setStatus(match.full_name + " marked present.");
+    setStatus(match.full_name + " checked in.");
     setPin("");
     setTimeout(() => setStatus(""), 3000);
   }

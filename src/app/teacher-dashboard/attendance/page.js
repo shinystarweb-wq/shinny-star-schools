@@ -249,6 +249,7 @@ function RemarkTab({ branch }) {
   const [activeClass, setActiveClass] = useState("");
   const [roster, setRoster] = useState([]);
   const [statusMap, setStatusMap] = useState({});
+  const [originalMap, setOriginalMap] = useState({});
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -289,7 +290,7 @@ function RemarkTab({ branch }) {
     setLoadingRoster(true);
     setMessage("");
 
-    const { data: students } = await supabase.from("students").select("id, full_name, photo_url").eq("branch", branch).eq("class", c).order("full_name");
+    const { data: students } = await supabase.from("students").select("id, full_name, photo_url, parent_phone, guardian_email").eq("branch", branch).eq("class", c).order("full_name");
     const ids = (students || []).map((s) => s.id);
     let att = [];
     if (ids.length > 0) {
@@ -303,6 +304,7 @@ function RemarkTab({ branch }) {
     });
     setRoster(students || []);
     setStatusMap(initial);
+    setOriginalMap(initial);
     setLoadingRoster(false);
   }
 
@@ -317,8 +319,15 @@ function RemarkTab({ branch }) {
       student_id: s.id, attendance_date: date, status: statusMap[s.id],
     }));
     const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "student_id,attendance_date" });
+
+    if (error) {
+      setSaving(false);
+      setMessage("Could not save: " + error.message);
+      return;
+    }
+
     setSaving(false);
-    setMessage(error ? "Could not save: " + error.message : "Changes saved.");
+    setMessage("Changes saved.");
   }
 
   return (
@@ -402,7 +411,7 @@ function RemarkTab({ branch }) {
                 </table>
               </div>
               {message && <p className="text-sm text-slate-600 mb-3">{message}</p>}
-              <button onClick={handleSave} disabled={saving} className="bg-brand-blue-strong text-white px-8 py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">{saving ? "Saving..." : "Save Changes"}</button>
+              <button onClick={handleSave} disabled={saving} className="bg-brand-blue-strong text-white px-8 py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-60">{saving ? "Saving & notifying..." : "Save Changes"}</button>
             </>
           )}
         </div>
